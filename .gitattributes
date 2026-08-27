@@ -1,0 +1,46 @@
+# ═══ FINS DE LIGNE ═══
+#
+# LF dans le depot ET dans la copie de travail, sur toutes les plateformes.
+# Sans cette ligne, git s'en remet a core.autocrlf, qui differe d'un poste a
+# l'autre : deux machines produisent alors des diffs ou seule la fin de ligne
+# change, et une revue devient illisible.
+* text=auto eol=lf
+
+# Ce qui doit rester en CRLF : l'interpreteur de commandes Windows coupe sur
+# un .bat ou un .cmd en LF, et PowerShell 5.1 se comporte mal de meme.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Ce qui doit rester en LF meme sous Windows : un shebang suivi d'un CR fait
+# echouer l'execution avec un message qui ne nomme jamais la cause.
+*.sh   text eol=lf
+
+# ═══ BINAIRES : AUCUNE CONVERSION ═══
+#
+# `text=auto` devine, et se trompe parfois sur un binaire qui ressemble a du
+# texte — la conversion le corrompt alors en silence.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.avif binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.7z   binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+*.otf  binary
+*.exe  binary
+*.dll  binary
+*.node binary
+
+# ═══ FICHIERS ENGENDRES ═══
+#
+# Replie le verrou dans les revues : il se lit par machine, pas par humain.
+pnpm-lock.yaml linguist-generated=true

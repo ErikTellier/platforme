@@ -1,0 +1,20 @@
+# Complement du .gitattributes, a l'autre bout de la chaine : git normalise au
+# COMMIT, ce fichier empeche l'editeur de produire du CRLF des la frappe. Sans
+# lui on corrige apres coup ce qu'on aurait pu ne pas ecrire.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Memes exceptions que le .gitattributes : cmd.exe coupe sur un batch en LF.
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Deux espaces en fin de ligne sont une coupure de ligne en Markdown.
+[*.md]
+trim_trailing_whitespace = false

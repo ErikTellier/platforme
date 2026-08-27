@@ -1,0 +1,76 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Impose le catalogue : `pnpm add` y inscrit la version au lieu de
+# l'ecrire dans le package.json de l'application.
+catalogMode: strict
+
+# Le champ `engines` devient CONTRAIGNANT : sans ca il est un commentaire, et
+# une mauvaise version de Node installe sans broncher pour casser plus loin.
+engineStrict: true
+
+# ═══ LE CATALOGUE ═══
+#
+# C'EST ICI QUE LES VERSIONS SE DECLARENT, ET NULLE PART AILLEURS.
+#
+# Un package.json d'application n'ecrit plus que `catalog:` : il dit de QUOI il
+# depend, jamais en QUELLE version. Sans ca, deux paquets du depot finissent par
+# epingler deux versions du meme outil — le lint passe ici et rougit la-bas,
+# pour une raison que personne ne cherche du bon cote.
+#
+# Une montee de version se fait donc en UN endroit, et se voit dans le diff.
+catalog:
+  # Nest
+  "@nestjs/common": ^11.1.11
+  "@nestjs/core": ^11.1.11
+  "@nestjs/platform-express": ^11.1.11
+  "@nestjs/cli": ^11.0.14
+  "@nestjs/schematics": ^11.0.9
+
+  # Execution
+  reflect-metadata: ^0.2.2
+  rxjs: ^7.8.2
+  source-map-support: ^0.5.21
+
+  # Compilation
+  #
+  # TypeScript est epingle EXACTEMENT, sans accent circonflexe : une version
+  # mineure change ce que le verificateur accepte, donc un `^` ferait rougir la
+  # compilation un matin sans qu'aucune ligne du depot n'ait bouge.
+  #
+  # Plafonne a 6 : le CLI Nest exige l'API programmatique du compilateur, que
+  # TypeScript 7.0 n'expose plus — elle est annoncee pour la 7.1.
+  typescript: 6.0.3
+  ts-loader: ^9.5.4
+  ts-node: ^10.9.2
+  tsconfig-paths: ^4.2.0
+
+  # Suit la version de Node du champ `engines`, pas la sienne.
+  "@types/node": ^24.13.3
+
+  # Lint et style
+  eslint: ^10.9.1
+  "@eslint/js": ^10.0.1
+  typescript-eslint: ^8.68.0
+  eslint-config-prettier: ^10.0.1
+  eslint-plugin-prettier: ^5.2.2
+  prettier: ^3.9.6
+  globals: ^17.0.0
+
+  # Banc d'essai
+  #
+  # Aucun transformeur a ajouter : Vitest 4 embarque Vite 8 / Rolldown, qui
+  # emet emitDecoratorMetadata. La recette unplugin-swc datait d'esbuild.
+  vitest: ^4.1.11
+
+  # Outillage du depot
+  turbo: ^2.10.12
+  zod: ^4.4.3
+  '@nestjs/config': ^4.0.4
+
+# Dependance transitive du CLI Nest et de ts-node, jamais utilisee ici : on
+# compile avec tsc, pas avec le constructeur SWC. Refus explicite plutot qu'un
+# avertissement qui se repete a chaque installation.
+allowBuilds:
+  '@swc/core': false
