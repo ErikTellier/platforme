@@ -1,5 +1,9 @@
 // @ts-check
 import eslint from '@eslint/js';
+// `defineConfig` du COEUR d'ESLint, et non `tseslint.config` : ce dernier est
+// deprecie depuis que la fonctionnalite a rejoint ESLint lui-meme. C'est la
+// regle `no-deprecated` de ce fichier qui l'a signale, applique a lui-meme.
+import { defineConfig } from 'eslint/config';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -16,7 +20,7 @@ import tseslint from 'typescript-eslint';
  * @param {{ tsconfigRootDir: string }} options
  */
 export function base({ tsconfigRootDir }) {
-  return tseslint.config(
+  return defineConfig(
     {
       ignores: ['dist/**', 'eslint.config.mjs'],
     },

@@ -12,6 +12,9 @@
     "base.js",
     "nest.js"
   ],
+  "scripts": {
+    "lint": "eslint \"*.js\""
+  },
   "dependencies": {
     "@eslint/js": "catalog:",
     "eslint": "catalog:",
@@ -20,5 +23,10 @@
     "globals": "catalog:",
     "prettier": "catalog:",
     "typescript-eslint": "catalog:"
+  },
+  "devDependencies": {
+    "@platforme/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }
