@@ -69,6 +69,18 @@ catalog:
   zod: ^4.4.3
   '@nestjs/config': ^4.0.4
 
+  # Harnais de securite : hooks git, message de commit, recherche de secrets.
+  #
+  # Ces outils ne servent qu'a la RACINE. Ils sont dans le catalogue quand meme,
+  # parce que catalogMode strict l'exige et qu'une version doit se lire au meme
+  # endroit que les autres, pas dans un package.json isole.
+  husky: ^9.1.7
+  lint-staged: ^17.3.0
+  '@commitlint/cli': ^21.2.2
+  '@commitlint/config-conventional': ^21.2.2
+  secretlint: ^13.0.5
+  '@secretlint/secretlint-rule-preset-recommend': ^13.0.5
+
 # Dependance transitive du CLI Nest et de ts-node, jamais utilisee ici : on
 # compile avec tsc, pas avec le constructeur SWC. Refus explicite plutot qu'un
 # avertissement qui se repete a chaque installation.

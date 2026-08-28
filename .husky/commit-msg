@@ -1,0 +1,14 @@
+# Valide le message contre la convention (voir commitlint.config.mjs).
+set -e
+
+pnpm exec commitlint --edit "$1"
+
+# ═══ LE JETON ═══
+#
+# Dernier hook avant que le commit existe. On depose ici la preuve que la chaine
+# complete a tourne. `post-commit` la cherchera, et conclura a un contournement
+# s'il ne la trouve pas.
+#
+# Ecrit ICI et non dans pre-commit : si commitlint refuse, aucun jeton ne doit
+# subsister, sinon un `--no-verify` immediatement apres le reutiliserait.
+date +%s >"$(git rev-parse --git-dir)/harnais-valide"

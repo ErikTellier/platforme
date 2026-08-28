@@ -1,0 +1,117 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  PRE-COMMIT — ce qui doit etre vrai AVANT qu'un commit existe.
+#
+#  Les garde-fous bon marche passent en premier : inutile de lancer dix
+#  secondes de lint pour refuser ensuite parce que le commit vise `main`.
+#
+#  Sur `--no-verify` : ce fichier est saute, mais `post-commit` ne l'est pas.
+#  Voir .husky/post-commit.
+# ═══════════════════════════════════════════════════════════════════════════
+
+set -e
+
+# ─── 1. Pas de commit direct sur une branche integree ────────────────────────
+branche=$(git rev-parse --abbrev-ref HEAD)
+case "$branche" in
+main | develop)
+  echo "" >&2
+  echo "REFUS : commit direct sur '$branche'." >&2
+  echo "" >&2
+  echo "  Ces branches ne recoivent que des fusions. Travaillez en branche :" >&2
+  echo "    git switch -c type/sujet" >&2
+  echo "" >&2
+  exit 1
+  ;;
+esac
+
+# ─── 2. Aucun fichier d'environnement n'entre dans l'historique ──────────────
+#
+# Le .gitignore suffit tant que personne n'ecrit `git add -f`. Ce controle vise
+# ce cas : un secret pousse se revoque, il ne s'efface pas. `.env.example` est
+# le seul autorise, c'est un modele et il ne contient rien.
+env_indexes=$(git diff --cached --name-only --diff-filter=ACM |
+  grep -E '(^|/)\.env($|\.)' |
+  grep -vE '(^|/)\.env\.example$' || true)
+
+if [ -n "$env_indexes" ]; then
+  echo "" >&2
+  echo "REFUS : un fichier d'environnement est indexe." >&2
+  echo "" >&2
+  echo "$env_indexes" | sed 's/^/    /' >&2
+  echo "" >&2
+  echo "  Retirez-le :  git restore --staged <fichier>" >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 3. Aucun marqueur de conflit ────────────────────────────────────────────
+#
+# Un `<<<<<<<` commite casse le fichier pour tout le monde, et se decouvre
+# toujours chez quelqu'un d'autre.
+conflits=$(git diff --cached -U0 | grep -nE '^\+(<{7}|>{7})' || true)
+
+if [ -n "$conflits" ]; then
+  echo "" >&2
+  echo "REFUS : marqueur de conflit dans le contenu indexe." >&2
+  echo "" >&2
+  echo "$conflits" | head -10 | sed 's/^/    /' >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 4. Aucun fichier demesure ───────────────────────────────────────────────
+#
+# Un binaire commite par megarde reste dans l'historique POUR TOUJOURS : le
+# retirer demande de reecrire toutes les branches. On refuse en amont.
+limite=2097152 # 2 Mio
+gros=$(git diff --cached --name-only --diff-filter=ACM | while read -r fichier; do
+  [ -f "$fichier" ] || continue
+  taille=$(wc -c <"$fichier")
+  if [ "$taille" -gt "$limite" ]; then
+    echo "    $fichier — $((taille / 1024)) Kio"
+  fi
+done)
+
+if [ -n "$gros" ]; then
+  echo "" >&2
+  echo "REFUS : fichier de plus de 2 Mio indexe." >&2
+  echo "" >&2
+  echo "$gros" >&2
+  echo "" >&2
+  echo "  L'historique git est definitif : un binaire y reste meme supprime." >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 5. Le verrou suit les manifestes ────────────────────────────────────────
+#
+# On ne se contente pas de « package.json indexe donc verrou indexe » : changer
+# un simple script ne touche pas au verrou, et ce raccourci refuserait des
+# commits legitimes. On demande a pnpm lui-meme si le verrou correspond encore.
+#
+# `--ignore-scripts` est OBLIGATOIRE : sans lui, `prepare` relancerait husky
+# depuis l'interieur d'un hook.
+manifestes=$(git diff --cached --name-only | grep -E '(^|/)package\.json$' || true)
+
+if [ -n "$manifestes" ]; then
+  if ! sortie=$(pnpm install --frozen-lockfile --ignore-scripts 2>&1); then
+    echo "" >&2
+    echo "REFUS : pnpm-lock.yaml ne correspond plus aux package.json." >&2
+    echo "" >&2
+    echo "$sortie" | tail -5 | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "  Lancez  pnpm install  puis indexez pnpm-lock.yaml." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+# ─── 6. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
+pnpm exec lint-staged
+
+# ─── 7. Lint typé complet ────────────────────────────────────────────────────
+#
+# Au niveau du PAQUET, pas du fichier : les regles typees ont besoin du tsconfig
+# du paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls
+# les paquets reellement touches sont relus.
+pnpm turbo run lint

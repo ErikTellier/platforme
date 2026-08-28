@@ -1,0 +1,13 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  PRE-PUSH — la passe complete, celle qui engage les autres.
+#
+#  Un commit n'engage que son auteur ; un push engage tout le monde. C'est donc
+#  ici que tourne la verification entiere, et non un sous-ensemble malin.
+#
+#  Le cout reel est proche de zero : turbo met en cache, et le pre-commit vient
+#  deja de lancer `lint`. Ne reste a payer que ce qui a change.
+# ═══════════════════════════════════════════════════════════════════════════
+
+set -e
+
+pnpm turbo run lint test build

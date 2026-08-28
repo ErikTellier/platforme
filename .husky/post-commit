@@ -1,0 +1,72 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  POST-COMMIT — le seul hook que `--no-verify` ne saute PAS.
+#
+#  `git commit --no-verify` court-circuite `pre-commit` et `commit-msg`. Il ne
+#  court-circuite pas celui-ci. On ne peut donc pas EMPECHER le commit, mais on
+#  peut le DEFAIRE — et le resultat est le meme : rien n'entre dans l'historique
+#  sans etre passe par la chaine.
+#
+#  `git reset --soft` : le commit disparait, le travail reste INDEXE. Rien n'est
+#  perdu, il n'y a qu'a corriger puis recommiter normalement.
+#
+#  Echappatoire volontaire : HARNAIS_DESACTIVE=1. Longue a taper, greppable dans
+#  un historique de shell — l'inverse d'un `-n` reflexe.
+# ═══════════════════════════════════════════════════════════════════════════
+
+repertoire_git=$(git rev-parse --git-dir)
+
+# ─── Ne JAMAIS intervenir pendant une operation qui rejoue des commits ───────
+#
+# Un rebase, un merge resolu ou un cherry-pick declenche post-commit sans passer
+# par pre-commit. Defaire un commit au milieu d'un rebase detruirait la suite.
+if [ -d "$repertoire_git/rebase-merge" ] ||
+  [ -d "$repertoire_git/rebase-apply" ] ||
+  [ -f "$repertoire_git/MERGE_HEAD" ] ||
+  [ -f "$repertoire_git/CHERRY_PICK_HEAD" ] ||
+  [ -f "$repertoire_git/REVERT_HEAD" ]; then
+  exit 0
+fi
+
+jeton="$repertoire_git/harnais-valide"
+
+# ─── Cas nominal : le jeton est la, on le consomme ───────────────────────────
+#
+# Consomme systematiquement, pour qu'un jeton ne serve jamais deux fois.
+if [ -f "$jeton" ]; then
+  rm -f "$jeton"
+  exit 0
+fi
+
+if [ "$HARNAIS_DESACTIVE" = "1" ]; then
+  echo "" >&2
+  echo "HARNAIS DESACTIVE — commit conserve sans aucune verification." >&2
+  echo "" >&2
+  exit 0
+fi
+
+# ─── Pas de jeton : les hooks ont ete court-circuites ────────────────────────
+sujet=$(git log -1 --pretty=%s)
+
+if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+  git reset --soft HEAD~1
+else
+  # Tout premier commit du depot : pas de parent ou revenir.
+  git update-ref -d HEAD
+fi
+
+echo "" >&2
+echo "═══════════════════════════════════════════════════════════════" >&2
+echo " COMMIT ANNULE — les hooks ont ete court-circuites." >&2
+echo "═══════════════════════════════════════════════════════════════" >&2
+echo "" >&2
+echo "  Message refuse : $sujet" >&2
+echo "" >&2
+echo "  Votre travail est INTACT et toujours indexe. Rien n'est perdu." >&2
+echo "  Recommitez sans --no-verify :" >&2
+echo "" >&2
+echo "    git commit -m \"type(portee): sujet\"" >&2
+echo "" >&2
+echo "  Si vous devez vraiment passer outre :" >&2
+echo "" >&2
+echo "    HARNAIS_DESACTIVE=1 git commit --no-verify -m \"...\"" >&2
+echo "" >&2
