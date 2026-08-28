@@ -275,3 +275,139 @@ describe('garde : echappatoire au controle qualite', () => {
     expect(tenterCommit(depot, 'echappatoire.sh')).toBe(0);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  LE CYCLE DE VIE DU JETON ANTI-CONTOURNEMENT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  `--no-verify` saute `pre-commit` et `commit-msg`, mais pas `post-commit`.
+ *  Le second depose un jeton, le troisieme le cherche : son absence trahit le
+ *  contournement, et le commit est defait.
+ *
+ *  Tout le danger est dans les chemins ou le jeton SURVIT sans etre consomme —
+ *  il devient alors un laissez-passer pour le commit suivant. Une fusion en
+ *  ouvrait un : git y lance `post-merge` et non `post-commit`. Bug reel, trouve
+ *  en preparant un simple `merge --no-ff`.
+ *
+ *  On installe ici les VRAIS `poser-jeton.sh` et `post-commit`, pas des copies.
+ */
+describe('jeton anti-contournement', () => {
+  /** Monte un depot ou commit-msg pose le jeton et post-commit le consomme. */
+  function depotArme(branche = 'travail'): string {
+    const depot = depotJetable(branche);
+    const crochets = join(depot, 'crochets');
+    mkdirSync(crochets, { recursive: true });
+
+    const poseur = join(GARDES, 'poser-jeton.sh').split(SEPARATEUR).join('/');
+    const apres = join(RACINE, '.husky', 'post-commit')
+      .split(SEPARATEUR)
+      .join('/');
+    const fusion = join(RACINE, '.husky', 'post-merge')
+      .split(SEPARATEUR)
+      .join('/');
+
+    writeFileSync(join(crochets, 'commit-msg'), `#!/bin/sh\nsh "${poseur}"\n`);
+    writeFileSync(join(crochets, 'post-commit'), `#!/bin/sh\nsh "${apres}"\n`);
+    writeFileSync(join(crochets, 'post-merge'), `#!/bin/sh\nsh "${fusion}"\n`);
+    git(depot, 'config', 'core.hooksPath', crochets);
+
+    return depot;
+  }
+
+  /** Le jeton restant dans .git, s'il y en a un. */
+  function jetonPresent(depot: string): boolean {
+    return existsSync(join(depot, '.git', 'harnais-valide'));
+  }
+
+  function nombreDeCommits(depot: string): number {
+    return Number(git(depot, 'rev-list', '--count', 'HEAD').trim());
+  }
+
+  it('conserve un commit normal', () => {
+    const depot = depotArme();
+    indexer(depot, 'a.txt', 'contenu\n');
+    const avant = nombreDeCommits(depot);
+
+    git(depot, 'commit', '-m', 'normal');
+
+    expect(nombreDeCommits(depot)).toBe(avant + 1);
+    expect(jetonPresent(depot)).toBe(false);
+  });
+
+  it('defait un commit passe en --no-verify, sans perdre le travail', () => {
+    const depot = depotArme();
+    indexer(depot, 'a.txt', 'contenu\n');
+    const avant = nombreDeCommits(depot);
+
+    git(depot, 'commit', '--no-verify', '-m', 'contourne');
+
+    expect(nombreDeCommits(depot)).toBe(avant);
+    // Le travail doit rester INDEXE : on defait le commit, pas le travail.
+    expect(git(depot, 'diff', '--cached', '--name-only')).toContain('a.txt');
+  });
+
+  it('ne laisse aucun jeton derriere une fusion', () => {
+    const depot = depotArme('develop');
+
+    // Preparation avec de VRAIS commits. Un `--no-verify` ici serait defait par
+    // post-commit : la branche resterait vide, la fusion n'aurait rien a
+    // fusionner, et le cas passerait au vert sans rien eprouver. Piege tombe
+    // une premiere fois en ecrivant ce banc.
+    git(depot, 'switch', '--quiet', '-c', 'sujet');
+    indexer(depot, 'sujet.txt', 'sujet\n');
+    git(depot, 'commit', '-m', 'sujet');
+    git(depot, 'switch', '--quiet', 'develop');
+
+    git(depot, 'merge', '--no-ff', 'sujet', '-m', 'Merge branch sujet');
+
+    expect(jetonPresent(depot)).toBe(false);
+  });
+
+  it('defait un --no-verify pose juste apres une fusion', () => {
+    const depot = depotArme('develop');
+    git(depot, 'switch', '--quiet', '-c', 'sujet');
+    indexer(depot, 'sujet.txt', 'sujet\n');
+    git(depot, 'commit', '--no-verify', '-m', 'sujet');
+    git(depot, 'switch', '--quiet', 'develop');
+    git(depot, 'merge', '--no-ff', 'sujet', '-m', 'Merge branch sujet');
+
+    indexer(depot, 'apres.txt', 'apres\n');
+    const avant = nombreDeCommits(depot);
+
+    git(depot, 'commit', '--no-verify', '-m', 'profite de la fusion');
+
+    expect(nombreDeCommits(depot)).toBe(avant);
+  });
+
+  it("conserve le commit quand l'echappatoire est demandee explicitement", () => {
+    const depot = depotArme();
+    indexer(depot, 'a.txt', 'contenu\n');
+    const avant = nombreDeCommits(depot);
+
+    execFileSync(
+      'git',
+      ['-C', depot, 'commit', '--no-verify', '-m', 'assume'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, HARNAIS_DESACTIVE: '1' },
+      },
+    );
+
+    expect(nombreDeCommits(depot)).toBe(avant + 1);
+  });
+  // ═══ CAS NON COUVERT ICI : LA FUSION RESOLUE A LA MAIN ═══
+  //
+  // `post-commit` refuse de defaire un commit a plusieurs parents. Sans cette
+  // protection, une fusion conflictuelle resolue par `git commit` se faisait
+  // ANNULER : commit-msg voit MERGE_HEAD et n'y pose pas de jeton, mais git a
+  // deja efface MERGE_HEAD quand post-commit s'execute.
+  //
+  // Le cas est verifie A LA MAIN, par reproduction directe : sans le comptage
+  // des parents la fusion disparait, avec lui elle survit.
+  //
+  // Il n'est PAS ici parce que je n'ai pas su le faire tenir dans ce banc — la
+  // preparation d'un vrai conflit y produisait un commit ordinaire, et le cas
+  // passait au vert des deux cotes. Un test qui ne peut pas rougir vaut moins
+  // que pas de test : il fait croire que la regression serait vue.
+});

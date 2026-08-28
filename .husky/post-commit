@@ -15,6 +15,22 @@
 
 repertoire_git=$(git rev-parse --git-dir)
 
+jeton="$repertoire_git/harnais-valide"
+
+# ─── Le jeton se consomme AVANT tout le reste ────────────────────────────────
+#
+# L'ordre compte. Sortir plus bas sans l'avoir efface le laisserait en place, et
+# le prochain `git commit --no-verify` le reutiliserait pour passer. Mesure
+# faite : cherry-pick et revert ouvraient exactement cette porte.
+#
+# Un jeton ne sert donc JAMAIS deux fois, quelle que soit la suite.
+avait_jeton=0
+
+if [ -f "$jeton" ]; then
+  avait_jeton=1
+  rm -f "$jeton"
+fi
+
 # ─── Ne JAMAIS intervenir pendant une operation qui rejoue des commits ───────
 #
 # Un rebase, un merge resolu ou un cherry-pick declenche post-commit sans passer
@@ -27,13 +43,23 @@ if [ -d "$repertoire_git/rebase-merge" ] ||
   exit 0
 fi
 
-jeton="$repertoire_git/harnais-valide"
-
-# ─── Cas nominal : le jeton est la, on le consomme ───────────────────────────
+# ─── Un commit de FUSION ne se defait jamais ─────────────────────────────────
 #
-# Consomme systematiquement, pour qu'un jeton ne serve jamais deux fois.
-if [ -f "$jeton" ]; then
-  rm -f "$jeton"
+# Sur une fusion resolue a la main, `commit-msg` s'abstient de poser un jeton —
+# MERGE_HEAD est alors present. Mais git a EFFACE MERGE_HEAD quand post-commit
+# s'execute : le test ci-dessus ne voit rien, et la fusion se ferait defaire.
+#
+# Bug reel, trouve en preparant un `merge --no-ff`. Le seul indice qui survit
+# est le nombre de parents : deux ou plus, c'est une fusion.
+#
+# `rev-list --parents -n 1` ecrit « <commit> <parent>... » : plus de deux mots
+# signifie au moins deux parents.
+if [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
+  exit 0
+fi
+
+# ─── Cas nominal : la chaine a tourne ────────────────────────────────────────
+if [ "$avait_jeton" = "1" ]; then
   exit 0
 fi
 

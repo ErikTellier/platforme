@@ -1,0 +1,7 @@
+# Filet de securite : une fusion ne doit jamais laisser de jeton derriere elle.
+#
+# `commit-msg` s'abstient deja d'en ecrire un quand MERGE_HEAD est present. Ce
+# hook couvre les chemins ou il en resterait quand meme un — un `git commit`
+# interrompu, une fusion reprise a la main. Un jeton orphelin vaut une porte
+# ouverte : on l'efface sans condition.
+rm -f "$(git rev-parse --git-dir)/harnais-valide"
