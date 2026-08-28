@@ -114,6 +114,8 @@ catalog:
   eslint-plugin-import-x: ^4.17.1
   knip: ^6.32.3
   eslint-import-resolver-typescript: ^4.4.5
+  '@stryker-mutator/core': ^10.0.0
+  '@stryker-mutator/vitest-runner': ^10.0.0
 
 # Dependance transitive du CLI Nest et de ts-node, jamais utilisee ici : on
 # compile avec tsc, pas avec le constructeur SWC. Refus explicite plutot qu'un

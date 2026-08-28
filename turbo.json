@@ -12,6 +12,10 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
+    "mutation": {
+      "dependsOn": ["^build"],
+      "outputs": ["reports/**"]
+    },
     "lint": {
       "dependsOn": ["^build"]
     },

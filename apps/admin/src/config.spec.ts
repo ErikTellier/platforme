@@ -1,8 +1,9 @@
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { config } from './config.js';
+import { configAdmin } from './config.js';
 
 /**
  * Ce que ce fichier verifie vraiment.
@@ -12,21 +13,27 @@ import { config } from './config.js';
  * cause. Une erreur ici ne se voit qu'au demarrage, en production.
  */
 describe('config admin', () => {
-  it('lit le .env de la racine du depot', () => {
-    // Depuis apps/admin/src, la racine est trois niveaux au-dessus.
-    const racine = resolve(import.meta.dirname, '..', '..', '..');
-
-    expect(config.envFilePath).toBe(resolve(racine, '.env'));
+  it('vise un .env pose a cote du marqueur de racine', () => {
+    // On affirme l'INVARIANT, pas une profondeur de dossiers : compter des
+    // « .. » ici reproduirait exactement le defaut que racineDuDepot evite, et
+    // ce test s'est effectivement casse la figure sous le bac a sable de
+    // Stryker, ou la profondeur n'est plus la meme.
+    expect(basename(configAdmin().envFilePath)).toBe('.env');
+    expect(
+      existsSync(
+        join(dirname(configAdmin().envFilePath), 'pnpm-workspace.yaml'),
+      ),
+    ).toBe(true);
   });
 
   it('retient 3000 quand ADMIN_PORT est absent', () => {
-    expect(config.validate({})).toEqual({ ADMIN_PORT: 3000 });
+    expect(configAdmin().validate({})).toEqual({ ADMIN_PORT: 3000 });
   });
 
   it('convertit la chaine de l environnement en nombre', () => {
     // Une variable d'environnement est TOUJOURS une chaine : sans la coercion,
     // `app.listen` recevrait "8080" au lieu de 8080.
-    expect(config.validate({ ADMIN_PORT: '8080' })).toEqual({
+    expect(configAdmin().validate({ ADMIN_PORT: '8080' })).toEqual({
       ADMIN_PORT: 8080,
     });
   });
@@ -37,21 +44,28 @@ describe('config admin', () => {
     ['non entier', '3000.5'],
     ['non numerique', 'quatre-vingts'],
   ])('refuse un port %s', (_cas, valeur) => {
-    expect(() => config.validate({ ADMIN_PORT: valeur })).toThrow(/ADMIN_PORT/);
+    expect(() => configAdmin().validate({ ADMIN_PORT: valeur })).toThrow(
+      /ADMIN_PORT/,
+    );
   });
 
   it('accepte les bornes exactes', () => {
-    expect(config.validate({ ADMIN_PORT: '1' })).toEqual({ ADMIN_PORT: 1 });
-    expect(config.validate({ ADMIN_PORT: '65535' })).toEqual({
+    expect(configAdmin().validate({ ADMIN_PORT: '1' })).toEqual({
+      ADMIN_PORT: 1,
+    });
+    expect(configAdmin().validate({ ADMIN_PORT: '65535' })).toEqual({
       ADMIN_PORT: 65535,
     });
   });
 
   it('ignore les variables etrangeres au schema', () => {
     // Le .env est PARTAGE : le schema d'admin doit laisser passer les cles des
-    // autres services sans s'en emouvoir, et sans les recopier dans sa config.
+    // autres services sans s'en emouvoir, et sans les recopier dans sa configAdmin().
     expect(
-      config.validate({ ADMIN_PORT: '3000', AUTRE_SERVICE_PORT: '4000' }),
+      configAdmin().validate({
+        ADMIN_PORT: '3000',
+        AUTRE_SERVICE_PORT: '4000',
+      }),
     ).toEqual({
       ADMIN_PORT: 3000,
     });

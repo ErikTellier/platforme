@@ -10,6 +10,7 @@
     "start": "nest start",
     "start:prod": "node dist/main.js",
     "test": "vitest run --coverage",
+    "mutation": "stryker run",
     "test:watch": "vitest",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\""
@@ -29,6 +30,8 @@
     "@nestjs/schematics": "catalog:",
     "@platforme/eslint-config": "workspace:*",
     "@platforme/typescript-config": "workspace:*",
+    "@stryker-mutator/core": "catalog:",
+    "@stryker-mutator/vitest-runner": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",

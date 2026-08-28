@@ -24,6 +24,10 @@ playwright-report/
 # Turbo
 .turbo
 
+# Tests de mutation
+.stryker-tmp
+reports
+
 # Vercel
 .vercel
 

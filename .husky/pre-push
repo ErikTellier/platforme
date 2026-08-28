@@ -97,8 +97,12 @@ fi
 # pendant qu'on travaille. Le laisser derriere soi ne l'est plus.
 pnpm knip
 
-# ─── 6. Lint, tests, construction ────────────────────────────────────────────
+# ─── 6. Lint, types, tests, mutation, construction ───────────────────────────
+#
+# `mutation` ferme la derniere porte : la couverture prouve qu une ligne a ete
+# EXECUTEE, jamais qu un test l AFFIRME. Stryker casse le code et verifie qu un
+# test rougit. 41 s a froid, 4 s des que rien n a change.
 #
 # Turbo met en cache et le pre-commit vient de lancer `lint` : il ne reste a
 # payer que ce qui a reellement change.
-pnpm turbo run typecheck lint test build
+pnpm turbo run typecheck lint test mutation build

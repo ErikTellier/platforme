@@ -85,7 +85,7 @@ describe('optionsDeConfig', () => {
     expect(validate({})).toEqual({ ADMIN_PORT: 3000 });
   });
 
-  it('leve en nommant la cle fautive et le fichier attendu', () => {
+  it('leve en nommant la cle fautive, le fichier attendu et le modele', () => {
     const { racine, profond } = fauxDepot('dist');
 
     const { validate } = optionsDeConfig({ dirname: profond, schema });
@@ -96,11 +96,14 @@ describe('optionsDeConfig', () => {
     } catch (erreur) {
       const message = (erreur as Error).message;
 
-      // Le message doit permettre de corriger SANS lire le code : quelle cle,
-      // quel probleme, et ou ecrire la valeur.
+      // Les LIBELLES sont affirmes, pas seulement les chemins : « .env » est
+      // une sous-chaine de « .env.example », donc un simple toContain sur le
+      // premier passerait meme si sa ligne entiere disparaissait.
       expect(message).toContain('ADMIN_PORT');
-      expect(message).toContain(resolve(racine, '.env'));
-      expect(message).toContain(resolve(racine, '.env.example'));
+      expect(message).toContain(`Attendu dans : ${resolve(racine, '.env')}`);
+      expect(message).toContain(
+        `Modele       : ${resolve(racine, '.env.example')}`,
+      );
     }
   });
 
@@ -117,5 +120,48 @@ describe('optionsDeConfig', () => {
     });
 
     expect(() => validate({})).toThrow(/\(racine\)/);
+  });
+
+  it('joint les segments d une cle imbriquee par un point', () => {
+    const { profond } = fauxDepot('dist');
+
+    const schemaImbrique = z.object({
+      BLOC: z.object({ PORT: z.coerce.number().int() }),
+    });
+
+    const { validate } = optionsDeConfig({
+      dirname: profond,
+      schema: schemaImbrique,
+    });
+
+    // Sans le separateur, la cle deviendrait « BLOCPORT » — illisible, et
+    // impossible a retrouver dans le .env.
+    expect(() => validate({ BLOC: { PORT: 'pas un nombre' } })).toThrow(
+      /BLOC\.PORT/,
+    );
+  });
+
+  it('place chaque probleme sur sa propre ligne', () => {
+    const { profond } = fauxDepot('dist');
+
+    const schemaDouble = z.object({
+      PREMIER_PORT: z.coerce.number().int(),
+      SECOND_PORT: z.coerce.number().int(),
+    });
+
+    const { validate } = optionsDeConfig({
+      dirname: profond,
+      schema: schemaDouble,
+    });
+
+    try {
+      validate({ PREMIER_PORT: 'a', SECOND_PORT: 'b' });
+      expect.unreachable('la validation aurait du lever');
+    } catch (erreur) {
+      const message = (erreur as Error).message;
+
+      // Deux problemes colles sur une seule ligne se lisent comme un seul.
+      expect(message).toMatch(/PREMIER_PORT : [^\n]*\n\s*SECOND_PORT : /);
+    }
   });
 });

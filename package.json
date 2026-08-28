@@ -13,6 +13,7 @@
     "typecheck": "turbo run typecheck",
     "knip": "knip",
     "test": "turbo run test",
+    "mutation": "turbo run mutation",
     "dev": "turbo run dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
