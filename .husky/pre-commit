@@ -138,10 +138,20 @@ if [ -n "$echappatoires" ]; then
   exit 1
 fi
 
-# ─── 7. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
+# ─── 7. Tout paquet declare ses verrous ──────────────────────────────────────
+#
+# `turbo run test` n'execute que les paquets qui DECLARENT un script `test` —
+# les autres sont ignores en silence, et turbo annonce quand meme un succes.
+# Mesure faite : un `apps/facturation` sans aucun script laissait turbo dire
+# « 3 successful » alors que rien de ce paquet n'avait ete verifie.
+#
+# Un verrou qu'on evite en ne le declarant pas n'est pas un verrou.
+node outils/verifier-paquets.mjs
+
+# ─── 8. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
 pnpm exec lint-staged
 
-# ─── 8. Lint typé complet ────────────────────────────────────────────────────
+# ─── 9. Lint typé complet ────────────────────────────────────────────────────
 #
 # Au niveau du PAQUET, pas du fichier : les regles typees ont besoin du tsconfig
 # du paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls
