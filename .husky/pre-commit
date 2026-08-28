@@ -25,7 +25,7 @@ done
 #
 # `turbo run test` n'execute que les paquets qui DECLARENT un script `test` —
 # les autres sont ignores en silence, et turbo annonce quand meme un succes.
-node outils/verifier-paquets.mjs
+node packages/harnais/verifier-paquets.mjs
 
 # ─── 3. Le verrou suit les manifestes ────────────────────────────────────────
 #

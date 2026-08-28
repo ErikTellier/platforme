@@ -2,10 +2,6 @@ packages:
   - "apps/*"
   - "packages/*"
 
-  # Le harnais lui-meme est un paquet : il se lint, se type-verifie et se
-  # TESTE comme le reste. Un garde-fou casse reste vert — trois l ont deja ete.
-  - "outils"
-
 # Impose le catalogue : `pnpm add` y inscrit la version au lieu de
 # l'ecrire dans le package.json de l'application.
 catalogMode: strict

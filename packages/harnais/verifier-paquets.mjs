@@ -21,9 +21,33 @@
  *  vides, et un script vide est exactement le vert qui ne prouve rien.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
-const RACINE_PAR_DEFAUT = resolve(import.meta.dirname, '..');
+/**
+ * La racine du depot, trouvee en REMONTANT jusqu'au marqueur.
+ *
+ * Et non `resolve(dirname, '..', '..')` : compter les niveaux encode la
+ * profondeur du paquet, et se trompe en silence le jour ou il demenage — ce qui
+ * vient precisement d'arriver a ce fichier, passe de outils/ a packages/.
+ *
+ * @param {string} depuis
+ * @returns {string}
+ */
+function racineDuDepot(depuis) {
+  let courant = resolve(depuis);
+
+  for (;;) {
+    if (existsSync(join(courant, 'pnpm-workspace.yaml'))) return courant;
+
+    const parent = dirname(courant);
+    if (parent === courant) {
+      throw new Error(`Racine du depot introuvable depuis ${depuis}.`);
+    }
+    courant = parent;
+  }
+}
+
+const RACINE_PAR_DEFAUT = racineDuDepot(import.meta.dirname);
 
 /** Le separateur de chemin de Windows, ecrit par son code pour rester lisible. */
 const SEPARATEUR = String.fromCharCode(92);

@@ -12,7 +12,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "knip": "knip",
-    "verifier:paquets": "node outils/verifier-paquets.mjs",
+    "verifier:paquets": "node packages/harnais/verifier-paquets.mjs",
     "test": "turbo run test",
     "mutation": "turbo run mutation",
     "dev": "turbo run dev",

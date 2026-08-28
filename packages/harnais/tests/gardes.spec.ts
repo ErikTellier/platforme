@@ -1,7 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -29,7 +35,27 @@ import { afterEach, describe, expect, it } from 'vitest';
  *  interpreteur : le chemin teste est exactement celui de production.
  */
 
-const RACINE = resolve(import.meta.dirname, '..', '..');
+/**
+ * La racine du depot, trouvee en REMONTANT jusqu'au marqueur.
+ *
+ * Et non `resolve(dirname, '..', '..')` : compter les niveaux encode la
+ * profondeur du paquet, et se trompe en silence le jour ou il demenage — ce qui
+ * vient precisement d'arriver a ce fichier, passe de outils/ a packages/.
+ */
+function racineDuDepot(depuis: string): string {
+  let courant = resolve(depuis);
+
+  for (;;) {
+    if (existsSync(join(courant, 'pnpm-workspace.yaml'))) return courant;
+
+    const parent = dirname(courant);
+    if (parent === courant)
+      throw new Error(`Racine introuvable depuis ${depuis}.`);
+    courant = parent;
+  }
+}
+
+const RACINE = racineDuDepot(import.meta.dirname);
 const GARDES = join(RACINE, '.husky', 'garde');
 
 /** Le separateur de chemin de Windows, ecrit par son code pour rester lisible. */
