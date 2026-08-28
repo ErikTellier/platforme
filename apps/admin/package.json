@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:prod": "node dist/main.js",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\""
@@ -29,6 +30,7 @@
     "@platforme/eslint-config": "workspace:*",
     "@platforme/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "source-map-support": "catalog:",

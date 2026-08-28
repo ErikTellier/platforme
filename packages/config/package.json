@@ -15,8 +15,11 @@
   ],
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "tsc --watch --preserveWatchOutput",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "zod": "catalog:"
@@ -25,8 +28,10 @@
     "@platforme/eslint-config": "workspace:*",
     "@platforme/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

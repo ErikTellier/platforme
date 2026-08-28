@@ -13,7 +13,8 @@
     "nest.js"
   ],
   "scripts": {
-    "lint": "eslint \"*.js\""
+    "lint": "eslint \"*.js\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@eslint/js": "catalog:",

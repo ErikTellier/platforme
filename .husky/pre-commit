@@ -108,12 +108,42 @@ if [ -n "$manifestes" ]; then
   fi
 fi
 
-# ─── 6. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
+# ─── 6. Aucune echappatoire au controle qualite ──────────────────────────────
+#
+# POURQUOI CE CONTROLE VIT ICI, ET NON DANS ESLINT
+#
+# On ne peut pas demander a ESLint d'interdire l'interrupteur qui l'eteint :
+# `/* eslint-disable */` coupe le linter AVANT que la moindre regle ne tourne,
+# `ban-ts-comment` compris. Et `tsc` n'offre aucune option pour refuser un
+# `@ts-nocheck`.
+#
+# Mesure faite le 2026-08-28 : un fichier portant ces deux lignes, avec un
+# parametre non type et un `any`, passait `pnpm lint` ET `pnpm build` sans une
+# seule erreur. Le seul endroit hors de leur portee est ici, sur le texte brut.
+echappatoires=$(git diff --cached -U0 -- '*.ts' '*.js' '*.mjs' '*.cjs' |
+  grep -E '^\+.*(//|/\*+)[[:space:]]*(eslint-disable|@ts-ignore|@ts-nocheck|@ts-expect-error)' || true)
+
+if [ -n "$echappatoires" ]; then
+  echo "" >&2
+  echo "REFUS : echappatoire au controle qualite dans le code indexe." >&2
+  echo "" >&2
+  echo "$echappatoires" | head -10 | sed 's/^/    /' >&2
+  echo "" >&2
+  echo "  Ces commentaires eteignent le linter ou le verificateur de types." >&2
+  echo "  Le code doit satisfaire les regles, pas les faire taire." >&2
+  echo "" >&2
+  echo "  Si une regle est vraiment inadaptee, elle se desactive dans la" >&2
+  echo "  configuration PARTAGEE, avec un motif ecrit — jamais dans un fichier." >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 7. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
 pnpm exec lint-staged
 
-# ─── 7. Lint typé complet ────────────────────────────────────────────────────
+# ─── 8. Lint typé complet ────────────────────────────────────────────────────
 #
 # Au niveau du PAQUET, pas du fichier : les regles typees ont besoin du tsconfig
 # du paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls
 # les paquets reellement touches sont relus.
-pnpm turbo run lint
+pnpm turbo run typecheck lint

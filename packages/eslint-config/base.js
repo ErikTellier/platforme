@@ -22,6 +22,16 @@ import tseslint from 'typescript-eslint';
 export function base({ tsconfigRootDir }) {
   return defineConfig(
     {
+      // Une directive `eslint-disable` devenue inutile est la trace d'un code
+      // qu'on a fait taire puis corrige : elle doit disparaitre avec lui.
+      // Le blocage des directives ACTIVES ne peut pas vivre ici — un
+      // `eslint-disable` coupe ESLint avant toute regle. Voir
+      // .husky/pre-commit, section 6.
+      linterOptions: {
+        reportUnusedDisableDirectives: 'error',
+      },
+    },
+    {
       ignores: ['dist/**', 'eslint.config.mjs'],
     },
     eslint.configs.recommended,

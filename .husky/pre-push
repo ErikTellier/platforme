@@ -74,8 +74,22 @@ pnpm audit --prod
 # l'installation du harnais, ou arrive par une fusion, n'a jamais ete examine.
 pnpm exec secretlint --maskSecrets --secretlintignore .gitignore "**/*"
 
-# ─── 4. Lint, tests, construction ────────────────────────────────────────────
+# ─── 4. Aucune echappatoire, dans TOUT le depot ──────────────────────────────
+#
+# Le pre-commit ne voit que l'indexe. Ici on relit l'ensemble : une echappatoire
+# arrivee par une fusion, ou posee avant l'installation du harnais, n'a jamais
+# ete examinee par personne.
+if trouvees=$(git grep -nE '(//|/\*+)[[:space:]]*(eslint-disable|@ts-ignore|@ts-nocheck|@ts-expect-error)' -- '*.ts' '*.js' '*.mjs' '*.cjs'); then
+  echo "" >&2
+  echo "REFUS : echappatoire au controle qualite dans le depot." >&2
+  echo "" >&2
+  echo "$trouvees" | head -20 | sed 's/^/    /' >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 5. Lint, tests, construction ────────────────────────────────────────────
 #
 # Turbo met en cache et le pre-commit vient de lancer `lint` : il ne reste a
 # payer que ce qui a reellement change.
-pnpm turbo run lint test build
+pnpm turbo run typecheck lint test build
