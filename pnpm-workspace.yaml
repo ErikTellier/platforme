@@ -63,7 +63,6 @@ catalog:
   # Execution
   reflect-metadata: ^0.2.2
   rxjs: ^7.8.2
-  source-map-support: ^0.5.21
 
   # Compilation
   #
@@ -74,9 +73,6 @@ catalog:
   # Plafonne a 6 : le CLI Nest exige l'API programmatique du compilateur, que
   # TypeScript 7.0 n'expose plus — elle est annoncee pour la 7.1.
   typescript: 6.0.3
-  ts-loader: ^9.5.4
-  ts-node: ^10.9.2
-  tsconfig-paths: ^4.2.0
 
   # Suit la version de Node du champ `engines`, pas la sienne.
   "@types/node": ^24.13.3
@@ -113,9 +109,23 @@ catalog:
   secretlint: ^13.0.5
   '@secretlint/secretlint-rule-preset-recommend': ^13.0.5
   '@vitest/coverage-v8': ^4.1.11
+  eslint-plugin-boundaries: ^7.2.0
+  eslint-plugin-sonarjs: ^4.2.0
+  eslint-plugin-import-x: ^4.17.1
+  knip: ^6.32.3
+  eslint-import-resolver-typescript: ^4.4.5
 
 # Dependance transitive du CLI Nest et de ts-node, jamais utilisee ici : on
 # compile avec tsc, pas avec le constructeur SWC. Refus explicite plutot qu'un
 # avertissement qui se repete a chaque installation.
 allowBuilds:
   '@swc/core': false
+
+  # Resolveur natif de eslint-plugin-import-x. Son script d'installation n'est
+  # qu'un REPLI : il telecharge le binaire quand la dependance optionnelle de la
+  # plateforme n'a pas pu etre resolue. Ici @unrs/resolver-binding-win32-x64-msvc
+  # est bien installe, donc le script n'a rien a faire.
+  #
+  # Refus explicite plutot que silence : c'est strictDepBuilds qui a leve la
+  # main, et une approbation sans motif ecrit ne vaut pas mieux qu'un defaut.
+  'unrs-resolver': false

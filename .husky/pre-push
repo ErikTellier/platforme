@@ -88,7 +88,16 @@ if trouvees=$(git grep -nE '(//|/\*+)[[:space:]]*(eslint-disable|@ts-ignore|@ts-
   exit 1
 fi
 
-# ─── 5. Lint, tests, construction ────────────────────────────────────────────
+# ─── 5. Code mort ────────────────────────────────────────────────────────────
+#
+# Exports jamais importes, fichiers orphelins, dependances declarees et
+# inutilisees, entrees de catalogue devenues sans objet.
+#
+# Au PUSH et non au commit : ecrire une fonction avant de l'appeler est normal
+# pendant qu'on travaille. Le laisser derriere soi ne l'est plus.
+pnpm knip
+
+# ─── 6. Lint, tests, construction ────────────────────────────────────────────
 #
 # Turbo met en cache et le pre-commit vient de lancer `lint` : il ne reste a
 # payer que ce qui a reellement change.

@@ -33,10 +33,6 @@
     "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "source-map-support": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
