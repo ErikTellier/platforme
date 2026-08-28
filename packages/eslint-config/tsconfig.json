@@ -1,0 +1,17 @@
+{
+  "extends": "@platforme/typescript-config/base.json",
+  "compilerOptions": {
+    // Ce paquet n'est PAS compile : il est publie en .js et consomme tel quel.
+    // Ce tsconfig n'existe que pour donner du type aux regles typees d'ESLint,
+    // que `projectService` va chercher ici.
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+
+    // Corollaires du `noEmit` : la base les active pour les paquets compiles.
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["*.js"]
+}

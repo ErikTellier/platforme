@@ -1,4 +1,4 @@
-import { optionsDeConfig } from '@platforme/config';
+import { optionsDeConfig, type OptionsDeConfig } from '@platforme/config';
 import { z } from 'zod';
 
 /**
@@ -15,4 +15,21 @@ const schema = z.object({
 /** Le type que `ConfigService` rendra, deduit du schema. */
 export type ConfigAdmin = z.infer<typeof schema>;
 
-export const config = optionsDeConfig({ dirname: import.meta.dirname, schema });
+/**
+ * UNE FONCTION, ET NON UNE CONSTANTE.
+ *
+ * Une constante de module ferait ce travail a l'IMPORT, avant qu'aucun test
+ * n'ait la main. Deux consequences, dans cet ordre d'importance :
+ *
+ *   1. Importer ce fichier declencherait une lecture du disque, meme pour un
+ *      test qui ne veut que le type.
+ *   2. Aucun test ne pourrait observer un changement de ces arguments — les
+ *      tests de mutation l'ont montre : remplacer `{ dirname, schema }` par
+ *      `{}` survivait, faute de pouvoir reevaluer le module.
+ *
+ * Un mutant qui survit signale toujours quelque chose. Ici, ce n'etait pas le
+ * test qui manquait : c'etait la forme du code qui l'empechait.
+ */
+export function configAdmin(): OptionsDeConfig<ConfigAdmin> {
+  return optionsDeConfig({ dirname: import.meta.dirname, schema });
+}

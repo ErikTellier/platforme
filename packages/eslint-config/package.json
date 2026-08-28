@@ -12,13 +12,26 @@
     "base.js",
     "nest.js"
   ],
+  "scripts": {
+    "lint": "eslint \"*.js\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "@eslint/js": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-boundaries": "catalog:",
+    "eslint-plugin-import-x": "catalog:",
     "eslint-plugin-prettier": "catalog:",
+    "eslint-plugin-sonarjs": "catalog:",
     "globals": "catalog:",
     "prettier": "catalog:",
     "typescript-eslint": "catalog:"
+  },
+  "devDependencies": {
+    "@platforme/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }

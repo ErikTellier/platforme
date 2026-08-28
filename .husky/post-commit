@@ -1,0 +1,98 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  POST-COMMIT — le seul hook que `--no-verify` ne saute PAS.
+#
+#  `git commit --no-verify` court-circuite `pre-commit` et `commit-msg`. Il ne
+#  court-circuite pas celui-ci. On ne peut donc pas EMPECHER le commit, mais on
+#  peut le DEFAIRE — et le resultat est le meme : rien n'entre dans l'historique
+#  sans etre passe par la chaine.
+#
+#  `git reset --soft` : le commit disparait, le travail reste INDEXE. Rien n'est
+#  perdu, il n'y a qu'a corriger puis recommiter normalement.
+#
+#  Echappatoire volontaire : HARNAIS_DESACTIVE=1. Longue a taper, greppable dans
+#  un historique de shell — l'inverse d'un `-n` reflexe.
+# ═══════════════════════════════════════════════════════════════════════════
+
+repertoire_git=$(git rev-parse --git-dir)
+
+jeton="$repertoire_git/harnais-valide"
+
+# ─── Le jeton se consomme AVANT tout le reste ────────────────────────────────
+#
+# L'ordre compte. Sortir plus bas sans l'avoir efface le laisserait en place, et
+# le prochain `git commit --no-verify` le reutiliserait pour passer. Mesure
+# faite : cherry-pick et revert ouvraient exactement cette porte.
+#
+# Un jeton ne sert donc JAMAIS deux fois, quelle que soit la suite.
+avait_jeton=0
+
+if [ -f "$jeton" ]; then
+  avait_jeton=1
+  rm -f "$jeton"
+fi
+
+# ─── Ne JAMAIS intervenir pendant une operation qui rejoue des commits ───────
+#
+# Un rebase, un merge resolu ou un cherry-pick declenche post-commit sans passer
+# par pre-commit. Defaire un commit au milieu d'un rebase detruirait la suite.
+if [ -d "$repertoire_git/rebase-merge" ] ||
+  [ -d "$repertoire_git/rebase-apply" ] ||
+  [ -f "$repertoire_git/MERGE_HEAD" ] ||
+  [ -f "$repertoire_git/CHERRY_PICK_HEAD" ] ||
+  [ -f "$repertoire_git/REVERT_HEAD" ]; then
+  exit 0
+fi
+
+# ─── Un commit de FUSION ne se defait jamais ─────────────────────────────────
+#
+# Sur une fusion resolue a la main, `commit-msg` s'abstient de poser un jeton —
+# MERGE_HEAD est alors present. Mais git a EFFACE MERGE_HEAD quand post-commit
+# s'execute : le test ci-dessus ne voit rien, et la fusion se ferait defaire.
+#
+# Bug reel, trouve en preparant un `merge --no-ff`. Le seul indice qui survit
+# est le nombre de parents : deux ou plus, c'est une fusion.
+#
+# `rev-list --parents -n 1` ecrit « <commit> <parent>... » : plus de deux mots
+# signifie au moins deux parents.
+if [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
+  exit 0
+fi
+
+# ─── Cas nominal : la chaine a tourne ────────────────────────────────────────
+if [ "$avait_jeton" = "1" ]; then
+  exit 0
+fi
+
+if [ "$HARNAIS_DESACTIVE" = "1" ]; then
+  echo "" >&2
+  echo "HARNAIS DESACTIVE — commit conserve sans aucune verification." >&2
+  echo "" >&2
+  exit 0
+fi
+
+# ─── Pas de jeton : les hooks ont ete court-circuites ────────────────────────
+sujet=$(git log -1 --pretty=%s)
+
+if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+  git reset --soft HEAD~1
+else
+  # Tout premier commit du depot : pas de parent ou revenir.
+  git update-ref -d HEAD
+fi
+
+echo "" >&2
+echo "═══════════════════════════════════════════════════════════════" >&2
+echo " COMMIT ANNULE — les hooks ont ete court-circuites." >&2
+echo "═══════════════════════════════════════════════════════════════" >&2
+echo "" >&2
+echo "  Message refuse : $sujet" >&2
+echo "" >&2
+echo "  Votre travail est INTACT et toujours indexe. Rien n'est perdu." >&2
+echo "  Recommitez sans --no-verify :" >&2
+echo "" >&2
+echo "    git commit -m \"type(portee): sujet\"" >&2
+echo "" >&2
+echo "  Si vous devez vraiment passer outre :" >&2
+echo "" >&2
+echo "    HARNAIS_DESACTIVE=1 git commit --no-verify -m \"...\"" >&2
+echo "" >&2

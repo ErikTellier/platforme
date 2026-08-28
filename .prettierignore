@@ -1,0 +1,19 @@
+# Prettier ne lit PAS le .gitignore : tout ce qui suit doit etre redit ici.
+
+# Engendre — se lit par machine, comme le dit le .gitattributes.
+pnpm-lock.yaml
+
+# Sorties de construction et caches.
+dist/
+.turbo/
+coverage/
+.stryker-tmp/
+reports/
+
+# ═══ MIS EN FORME A LA MAIN ═══
+#
+# Ce fichier est le plus commente du depot, et son alignement porte du sens.
+# Avec `singleQuote: true`, prettier reecrirait chaque "@nestjs/..." en
+# '@nestjs/...' et reflowerait les blocs de commentaire : un diff bruyant sur
+# le seul fichier ou chaque ligne a ete pesee. On l'exclut sciemment.
+pnpm-workspace.yaml

@@ -1,0 +1,108 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  PRE-PUSH — la passe complete, celle qui engage les autres.
+#
+#  Un commit n'engage que son auteur ; un push engage tout le monde.
+#
+#  ATTENTION : `git push --no-verify` saute ce fichier, et il n'existe aucun
+#  `post-push` pour le rattraper. Contrairement au commit, ce niveau reste
+#  contournable. Ce qui est garanti, c'est que chaque COMMIT pousse est passe
+#  par la chaine (voir .husky/post-commit).
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── 1. Integrite des branches integrees ─────────────────────────────────────
+#
+# Git ecrit sur l'entree standard une ligne par ref poussee :
+#     <ref locale> <sha local> <ref distante> <sha distant>
+#
+# Lu AVANT tout le reste : c'est le seul controle qui ne depend ni de node ni
+# de pnpm, et le plus grave a laisser passer.
+VIDE=0000000000000000000000000000000000000000
+refus=0
+
+while read -r _ref_locale sha_local ref_distante sha_distant; do
+  case "$ref_distante" in
+  refs/heads/main | refs/heads/develop)
+    branche=${ref_distante#refs/heads/}
+
+    if [ "$sha_local" = "$VIDE" ]; then
+      echo "" >&2
+      echo "REFUS : suppression de la branche distante '$branche'." >&2
+      refus=1
+      continue
+    fi
+
+    # Un push est legitime si le distant est un ANCETRE du local. Sinon on
+    # reecrit un historique que d'autres ont deja.
+    if [ "$sha_distant" != "$VIDE" ] &&
+      ! git merge-base --is-ancestor "$sha_distant" "$sha_local" 2>/dev/null; then
+      echo "" >&2
+      echo "REFUS : push non-fast-forward sur '$branche'." >&2
+      echo "" >&2
+      echo "    distant : $sha_distant" >&2
+      echo "    local   : $sha_local" >&2
+      echo "" >&2
+      echo "  Cet historique est deja chez les autres. Le reecrire casse" >&2
+      echo "  leur copie. Rebasez sur le distant plutot que de forcer." >&2
+      refus=1
+    fi
+    ;;
+  esac
+done
+
+if [ "$refus" -ne 0 ]; then
+  echo "" >&2
+  exit 1
+fi
+
+. ./.husky/commun.sh
+
+set -e
+
+# ─── 2. Vulnerabilites connues, dependances de PRODUCTION ────────────────────
+#
+# `--prod` et non `--omit=dev` : ce dernier est de la syntaxe npm, pnpm ne le
+# connait pas. Restreint a la production parce qu'une faille dans un outil de
+# build ne s'execute pas chez l'utilisateur.
+#
+# Ce controle depend du REGISTRE : une panne reseau bloquera vos push. C'est
+# assume. Pour le rendre tolerant, ajouter --ignore-registry-errors.
+pnpm audit --prod
+
+# ─── 3. Recherche de secrets sur TOUT le depot ───────────────────────────────
+#
+# Le pre-commit ne voit que l'indexe. Ici on relit tout : un secret pose avant
+# l'installation du harnais, ou arrive par une fusion, n'a jamais ete examine.
+pnpm exec secretlint --maskSecrets --secretlintignore .gitignore "**/*"
+
+# ─── 4. Aucune echappatoire, dans TOUT le depot ──────────────────────────────
+#
+# Le pre-commit ne voit que l'indexe. Ici on relit l'ensemble : une echappatoire
+# arrivee par une fusion, ou posee avant l'installation du harnais, n'a jamais
+# ete examinee par personne.
+if trouvees=$(git grep -nE '(//|/\*+)[[:space:]]*(eslint-disable|@ts-ignore|@ts-nocheck|@ts-expect-error)' -- '*.ts' '*.js' '*.mjs' '*.cjs'); then
+  echo "" >&2
+  echo "REFUS : echappatoire au controle qualite dans le depot." >&2
+  echo "" >&2
+  echo "$trouvees" | head -20 | sed 's/^/    /' >&2
+  echo "" >&2
+  exit 1
+fi
+
+# ─── 5. Code mort ────────────────────────────────────────────────────────────
+#
+# Exports jamais importes, fichiers orphelins, dependances declarees et
+# inutilisees, entrees de catalogue devenues sans objet.
+#
+# Au PUSH et non au commit : ecrire une fonction avant de l'appeler est normal
+# pendant qu'on travaille. Le laisser derriere soi ne l'est plus.
+pnpm knip
+
+# ─── 6. Lint, types, tests, mutation, construction ───────────────────────────
+#
+# `mutation` ferme la derniere porte : la couverture prouve qu une ligne a ete
+# EXECUTEE, jamais qu un test l AFFIRME. Stryker casse le code et verifie qu un
+# test rougit. 41 s a froid, 4 s des que rien n a change.
+#
+# Turbo met en cache et le pre-commit vient de lancer `lint` : il ne reste a
+# payer que ce qui a reellement change.
+pnpm turbo run typecheck lint test mutation build

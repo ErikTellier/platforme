@@ -10,6 +10,38 @@ catalogMode: strict
 # une mauvaise version de Node installe sans broncher pour casser plus loin.
 engineStrict: true
 
+# ═══ CHAINE D'APPROVISIONNEMENT ═══
+#
+# Ecrits ICI meme quand ils valent deja le defaut de pnpm 11 : un defaut se
+# deplace d'une version a l'autre sans prevenir, et ces deux lignes font la
+# difference entre etre protege et croire l'etre.
+
+# Un paquet publie il y a moins de 24 h ne s'installe pas. C'est la parade au
+# scenario habituel : compte de mainteneur compromis, version malveillante
+# publiee, retiree en quelques heures. On laisse simplement passer la fenetre.
+minimumReleaseAge: 1440
+
+# Refuse un paquet qui PERD ses preuves de confiance par rapport a ses versions
+# anterieures — signal typique d'un compte de publication compromis.
+# Defaut pnpm : off.
+trustPolicy: no-downgrade
+
+# EXCEPTION, examinee le 2026-08-28.
+#
+# La politique ci-dessus rejette chokidar@4.0.3 : « high-risk trust downgrade,
+# possible package takeover ». Examen fait :
+#
+#   - DEV UNIQUEMENT. Chaine : @nestjs/cli -> @nestjs/schematics ->
+#     @angular-devkit/core, ou chokidar est un pair OPTIONNEL. Rien de tout
+#     cela n'est expedie en production.
+#   - AUCUNE SORTIE PAR MISE A JOUR. 4.0.3 est la derniere 4.x publiee, et
+#     @angular-devkit exige ^4.0.0 : la 5.0.0 est hors contrainte.
+#
+# Epinglee a la VERSION EXACTE, et non au nom du paquet : le jour ou une
+# 4.0.4 parait, elle repasse par la politique au lieu d'heriter du blanc-seing.
+trustPolicyExclude:
+  - 'chokidar@4.0.3'
+
 # ═══ LE CATALOGUE ═══
 #
 # C'EST ICI QUE LES VERSIONS SE DECLARENT, ET NULLE PART AILLEURS.
@@ -31,7 +63,6 @@ catalog:
   # Execution
   reflect-metadata: ^0.2.2
   rxjs: ^7.8.2
-  source-map-support: ^0.5.21
 
   # Compilation
   #
@@ -42,9 +73,6 @@ catalog:
   # Plafonne a 6 : le CLI Nest exige l'API programmatique du compilateur, que
   # TypeScript 7.0 n'expose plus — elle est annoncee pour la 7.1.
   typescript: 6.0.3
-  ts-loader: ^9.5.4
-  ts-node: ^10.9.2
-  tsconfig-paths: ^4.2.0
 
   # Suit la version de Node du champ `engines`, pas la sienne.
   "@types/node": ^24.13.3
@@ -69,8 +97,37 @@ catalog:
   zod: ^4.4.3
   '@nestjs/config': ^4.0.4
 
+  # Harnais de securite : hooks git, message de commit, recherche de secrets.
+  #
+  # Ces outils ne servent qu'a la RACINE. Ils sont dans le catalogue quand meme,
+  # parce que catalogMode strict l'exige et qu'une version doit se lire au meme
+  # endroit que les autres, pas dans un package.json isole.
+  husky: ^9.1.7
+  lint-staged: ^17.3.0
+  '@commitlint/cli': ^21.2.2
+  '@commitlint/config-conventional': ^21.2.2
+  secretlint: ^13.0.5
+  '@secretlint/secretlint-rule-preset-recommend': ^13.0.5
+  '@vitest/coverage-v8': ^4.1.11
+  eslint-plugin-boundaries: ^7.2.0
+  eslint-plugin-sonarjs: ^4.2.0
+  eslint-plugin-import-x: ^4.17.1
+  knip: ^6.32.3
+  eslint-import-resolver-typescript: ^4.4.5
+  '@stryker-mutator/core': ^10.0.0
+  '@stryker-mutator/vitest-runner': ^10.0.0
+
 # Dependance transitive du CLI Nest et de ts-node, jamais utilisee ici : on
 # compile avec tsc, pas avec le constructeur SWC. Refus explicite plutot qu'un
 # avertissement qui se repete a chaque installation.
 allowBuilds:
   '@swc/core': false
+
+  # Resolveur natif de eslint-plugin-import-x. Son script d'installation n'est
+  # qu'un REPLI : il telecharge le binaire quand la dependance optionnelle de la
+  # plateforme n'a pas pu etre resolue. Ici @unrs/resolver-binding-win32-x64-msvc
+  # est bien installe, donc le script n'a rien a faire.
+  #
+  # Refus explicite plutot que silence : c'est strictDepBuilds qui a leve la
+  # main, et une approbation sans motif ecrit ne vaut pas mieux qu'un defaut.
+  'unrs-resolver': false

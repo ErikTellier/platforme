@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // ═══ POURQUOI CETTE EXCEPTION ═══
+  //
+  // Le preregage de secretlint n'est reference nulle part dans le code : il est
+  // nomme dans `.secretlintrc.json`, que knip ne lit pas. C'est un faux
+  // positif, pas une dependance morte — le retirer casserait la recherche de
+  // secrets des le prochain commit.
+  //
+  // Toute autre entree ajoutee ici doit porter son motif, comme celle-ci.
+  // Une liste d'exceptions sans justification redevient du code mort.
+  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend"],
+}

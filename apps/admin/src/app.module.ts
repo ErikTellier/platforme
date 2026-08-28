@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { config } from './config.js';
+import { configAdmin } from './config.js';
 
 @Module({
-  imports: [ConfigModule.forRoot(config)],
+  imports: [ConfigModule.forRoot(configAdmin())],
 })
 export class AppModule {}

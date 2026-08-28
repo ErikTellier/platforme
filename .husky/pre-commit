@@ -1,0 +1,61 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  PRE-COMMIT — ce qui doit etre vrai AVANT qu'un commit existe.
+#
+#  Les garde-fous bon marche passent en premier : inutile de lancer dix
+#  secondes de lint pour refuser ensuite parce que le commit vise `main`.
+#
+#  Chaque garde vit dans son propre fichier sous .husky/garde/. Ce n'est pas
+#  du rangement : c'est ce qui les rend TESTABLES un par un. Ils ont leur banc
+#  d'essai dans packages/harnais — parce qu'un garde-fou casse reste vert, et
+#  que trois d'entre eux l'ont deja ete.
+#
+#  Sur `--no-verify` : ce fichier est saute, mais `post-commit` ne l'est pas.
+# ═══════════════════════════════════════════════════════════════════════════
+
+. ./.husky/commun.sh
+
+set -e
+
+# ─── 1. Les gardes bon marche, dans l'ordre du moins cher au plus cher ───────
+for garde in branche-protegee fichier-env marqueur-conflit fichier-demesure echappatoire; do
+  sh "./.husky/garde/$garde.sh"
+done
+
+# ─── 2. Tout paquet declare ses verrous ──────────────────────────────────────
+#
+# `turbo run test` n'execute que les paquets qui DECLARENT un script `test` —
+# les autres sont ignores en silence, et turbo annonce quand meme un succes.
+node packages/harnais/verifier-paquets.mjs
+
+# ─── 3. Le verrou suit les manifestes ────────────────────────────────────────
+#
+# On ne se contente pas de « package.json indexe donc verrou indexe » : changer
+# un simple script ne touche pas au verrou, et ce raccourci refuserait des
+# commits legitimes. On demande a pnpm lui-meme si le verrou correspond encore.
+#
+# `--ignore-scripts` est OBLIGATOIRE : sans lui, `prepare` relancerait husky
+# depuis l'interieur d'un hook.
+manifestes=$(git diff --cached --name-only | grep -E '(^|/)package\.json$' || true)
+
+if [ -n "$manifestes" ]; then
+  if ! sortie=$(pnpm install --frozen-lockfile --ignore-scripts 2>&1); then
+    echo "" >&2
+    echo "REFUS : pnpm-lock.yaml ne correspond plus aux package.json." >&2
+    echo "" >&2
+    echo "$sortie" | tail -5 | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "  Lancez  pnpm install  puis indexez pnpm-lock.yaml." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+# ─── 4. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
+pnpm exec lint-staged
+
+# ─── 5. Types et lint, au niveau du PAQUET ───────────────────────────────────
+#
+# Pas au niveau du fichier : les regles typees ont besoin du tsconfig du
+# paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls les
+# paquets reellement touches sont relus.
+pnpm turbo run typecheck lint

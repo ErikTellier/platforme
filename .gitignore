@@ -24,6 +24,10 @@ playwright-report/
 # Turbo
 .turbo
 
+# Tests de mutation
+.stryker-tmp
+reports
+
 # Vercel
 .vercel
 
@@ -43,11 +47,7 @@ dist
 *.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.vscode/
 
 # Debug
 logs

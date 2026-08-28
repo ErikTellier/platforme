@@ -15,7 +15,12 @@
   ],
   "scripts": {
     "build": "tsc",
-    "lint": "eslint \"src/**/*.ts\""
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "tsc --watch --preserveWatchOutput",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run --coverage",
+    "mutation": "stryker run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "zod": "catalog:"
@@ -23,9 +28,12 @@
   "devDependencies": {
     "@platforme/eslint-config": "workspace:*",
     "@platforme/typescript-config": "workspace:*",
+    "@stryker-mutator/core": "catalog:",
+    "@stryker-mutator/vitest-runner": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
-    "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
