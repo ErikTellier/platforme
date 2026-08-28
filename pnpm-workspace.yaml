@@ -10,6 +10,38 @@ catalogMode: strict
 # une mauvaise version de Node installe sans broncher pour casser plus loin.
 engineStrict: true
 
+# ═══ CHAINE D'APPROVISIONNEMENT ═══
+#
+# Ecrits ICI meme quand ils valent deja le defaut de pnpm 11 : un defaut se
+# deplace d'une version a l'autre sans prevenir, et ces deux lignes font la
+# difference entre etre protege et croire l'etre.
+
+# Un paquet publie il y a moins de 24 h ne s'installe pas. C'est la parade au
+# scenario habituel : compte de mainteneur compromis, version malveillante
+# publiee, retiree en quelques heures. On laisse simplement passer la fenetre.
+minimumReleaseAge: 1440
+
+# Refuse un paquet qui PERD ses preuves de confiance par rapport a ses versions
+# anterieures — signal typique d'un compte de publication compromis.
+# Defaut pnpm : off.
+trustPolicy: no-downgrade
+
+# EXCEPTION, examinee le 2026-08-28.
+#
+# La politique ci-dessus rejette chokidar@4.0.3 : « high-risk trust downgrade,
+# possible package takeover ». Examen fait :
+#
+#   - DEV UNIQUEMENT. Chaine : @nestjs/cli -> @nestjs/schematics ->
+#     @angular-devkit/core, ou chokidar est un pair OPTIONNEL. Rien de tout
+#     cela n'est expedie en production.
+#   - AUCUNE SORTIE PAR MISE A JOUR. 4.0.3 est la derniere 4.x publiee, et
+#     @angular-devkit exige ^4.0.0 : la 5.0.0 est hors contrainte.
+#
+# Epinglee a la VERSION EXACTE, et non au nom du paquet : le jour ou une
+# 4.0.4 parait, elle repasse par la politique au lieu d'heriter du blanc-seing.
+trustPolicyExclude:
+  - 'chokidar@4.0.3'
+
 # ═══ LE CATALOGUE ═══
 #
 # C'EST ICI QUE LES VERSIONS SE DECLARENT, ET NULLE PART AILLEURS.

@@ -1,4 +1,6 @@
 # Valide le message contre la convention (voir commitlint.config.mjs).
+. ./.husky/commun.sh
+
 set -e
 
 pnpm exec commitlint --edit "$1"

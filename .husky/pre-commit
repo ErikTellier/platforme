@@ -8,6 +8,8 @@
 #  Voir .husky/post-commit.
 # ═══════════════════════════════════════════════════════════════════════════
 
+. ./.husky/commun.sh
+
 set -e
 
 # ─── 1. Pas de commit direct sur une branche integree ────────────────────────

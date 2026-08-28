@@ -1,13 +1,81 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  PRE-PUSH — la passe complete, celle qui engage les autres.
 #
-#  Un commit n'engage que son auteur ; un push engage tout le monde. C'est donc
-#  ici que tourne la verification entiere, et non un sous-ensemble malin.
+#  Un commit n'engage que son auteur ; un push engage tout le monde.
 #
-#  Le cout reel est proche de zero : turbo met en cache, et le pre-commit vient
-#  deja de lancer `lint`. Ne reste a payer que ce qui a change.
+#  ATTENTION : `git push --no-verify` saute ce fichier, et il n'existe aucun
+#  `post-push` pour le rattraper. Contrairement au commit, ce niveau reste
+#  contournable. Ce qui est garanti, c'est que chaque COMMIT pousse est passe
+#  par la chaine (voir .husky/post-commit).
 # ═══════════════════════════════════════════════════════════════════════════
+
+# ─── 1. Integrite des branches integrees ─────────────────────────────────────
+#
+# Git ecrit sur l'entree standard une ligne par ref poussee :
+#     <ref locale> <sha local> <ref distante> <sha distant>
+#
+# Lu AVANT tout le reste : c'est le seul controle qui ne depend ni de node ni
+# de pnpm, et le plus grave a laisser passer.
+VIDE=0000000000000000000000000000000000000000
+refus=0
+
+while read -r _ref_locale sha_local ref_distante sha_distant; do
+  case "$ref_distante" in
+  refs/heads/main | refs/heads/develop)
+    branche=${ref_distante#refs/heads/}
+
+    if [ "$sha_local" = "$VIDE" ]; then
+      echo "" >&2
+      echo "REFUS : suppression de la branche distante '$branche'." >&2
+      refus=1
+      continue
+    fi
+
+    # Un push est legitime si le distant est un ANCETRE du local. Sinon on
+    # reecrit un historique que d'autres ont deja.
+    if [ "$sha_distant" != "$VIDE" ] &&
+      ! git merge-base --is-ancestor "$sha_distant" "$sha_local" 2>/dev/null; then
+      echo "" >&2
+      echo "REFUS : push non-fast-forward sur '$branche'." >&2
+      echo "" >&2
+      echo "    distant : $sha_distant" >&2
+      echo "    local   : $sha_local" >&2
+      echo "" >&2
+      echo "  Cet historique est deja chez les autres. Le reecrire casse" >&2
+      echo "  leur copie. Rebasez sur le distant plutot que de forcer." >&2
+      refus=1
+    fi
+    ;;
+  esac
+done
+
+if [ "$refus" -ne 0 ]; then
+  echo "" >&2
+  exit 1
+fi
+
+. ./.husky/commun.sh
 
 set -e
 
+# ─── 2. Vulnerabilites connues, dependances de PRODUCTION ────────────────────
+#
+# `--prod` et non `--omit=dev` : ce dernier est de la syntaxe npm, pnpm ne le
+# connait pas. Restreint a la production parce qu'une faille dans un outil de
+# build ne s'execute pas chez l'utilisateur.
+#
+# Ce controle depend du REGISTRE : une panne reseau bloquera vos push. C'est
+# assume. Pour le rendre tolerant, ajouter --ignore-registry-errors.
+pnpm audit --prod
+
+# ─── 3. Recherche de secrets sur TOUT le depot ───────────────────────────────
+#
+# Le pre-commit ne voit que l'indexe. Ici on relit tout : un secret pose avant
+# l'installation du harnais, ou arrive par une fusion, n'a jamais ete examine.
+pnpm exec secretlint --maskSecrets --secretlintignore .gitignore "**/*"
+
+# ─── 4. Lint, tests, construction ────────────────────────────────────────────
+#
+# Turbo met en cache et le pre-commit vient de lancer `lint` : il ne reste a
+# payer que ce qui a reellement change.
 pnpm turbo run lint test build
