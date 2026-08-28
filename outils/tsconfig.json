@@ -1,0 +1,15 @@
+{
+  "extends": "@platforme/typescript-config/base.json",
+  "compilerOptions": {
+    // Ce paquet n'est pas compile : il s'execute tel quel, en ESM natif, et le
+    // pre-commit l'invoque AVANT toute construction. Ce tsconfig ne sert qu'a
+    // le type-verifier et a nourrir les regles typees d'ESLint.
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["*.mjs", "tests", "vitest.config.ts"]
+}

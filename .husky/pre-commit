@@ -4,88 +4,30 @@
 #  Les garde-fous bon marche passent en premier : inutile de lancer dix
 #  secondes de lint pour refuser ensuite parce que le commit vise `main`.
 #
+#  Chaque garde vit dans son propre fichier sous .husky/garde/. Ce n'est pas
+#  du rangement : c'est ce qui les rend TESTABLES un par un. Ils ont leur banc
+#  d'essai dans packages/harnais — parce qu'un garde-fou casse reste vert, et
+#  que trois d'entre eux l'ont deja ete.
+#
 #  Sur `--no-verify` : ce fichier est saute, mais `post-commit` ne l'est pas.
-#  Voir .husky/post-commit.
 # ═══════════════════════════════════════════════════════════════════════════
 
 . ./.husky/commun.sh
 
 set -e
 
-# ─── 1. Pas de commit direct sur une branche integree ────────────────────────
-branche=$(git rev-parse --abbrev-ref HEAD)
-case "$branche" in
-main | develop)
-  echo "" >&2
-  echo "REFUS : commit direct sur '$branche'." >&2
-  echo "" >&2
-  echo "  Ces branches ne recoivent que des fusions. Travaillez en branche :" >&2
-  echo "    git switch -c type/sujet" >&2
-  echo "" >&2
-  exit 1
-  ;;
-esac
+# ─── 1. Les gardes bon marche, dans l'ordre du moins cher au plus cher ───────
+for garde in branche-protegee fichier-env marqueur-conflit fichier-demesure echappatoire; do
+  sh "./.husky/garde/$garde.sh"
+done
 
-# ─── 2. Aucun fichier d'environnement n'entre dans l'historique ──────────────
+# ─── 2. Tout paquet declare ses verrous ──────────────────────────────────────
 #
-# Le .gitignore suffit tant que personne n'ecrit `git add -f`. Ce controle vise
-# ce cas : un secret pousse se revoque, il ne s'efface pas. `.env.example` est
-# le seul autorise, c'est un modele et il ne contient rien.
-env_indexes=$(git diff --cached --name-only --diff-filter=ACM |
-  grep -E '(^|/)\.env($|\.)' |
-  grep -vE '(^|/)\.env\.example$' || true)
+# `turbo run test` n'execute que les paquets qui DECLARENT un script `test` —
+# les autres sont ignores en silence, et turbo annonce quand meme un succes.
+node outils/verifier-paquets.mjs
 
-if [ -n "$env_indexes" ]; then
-  echo "" >&2
-  echo "REFUS : un fichier d'environnement est indexe." >&2
-  echo "" >&2
-  echo "$env_indexes" | sed 's/^/    /' >&2
-  echo "" >&2
-  echo "  Retirez-le :  git restore --staged <fichier>" >&2
-  echo "" >&2
-  exit 1
-fi
-
-# ─── 3. Aucun marqueur de conflit ────────────────────────────────────────────
-#
-# Un `<<<<<<<` commite casse le fichier pour tout le monde, et se decouvre
-# toujours chez quelqu'un d'autre.
-conflits=$(git diff --cached -U0 | grep -nE '^\+(<{7}|>{7})' || true)
-
-if [ -n "$conflits" ]; then
-  echo "" >&2
-  echo "REFUS : marqueur de conflit dans le contenu indexe." >&2
-  echo "" >&2
-  echo "$conflits" | head -10 | sed 's/^/    /' >&2
-  echo "" >&2
-  exit 1
-fi
-
-# ─── 4. Aucun fichier demesure ───────────────────────────────────────────────
-#
-# Un binaire commite par megarde reste dans l'historique POUR TOUJOURS : le
-# retirer demande de reecrire toutes les branches. On refuse en amont.
-limite=2097152 # 2 Mio
-gros=$(git diff --cached --name-only --diff-filter=ACM | while read -r fichier; do
-  [ -f "$fichier" ] || continue
-  taille=$(wc -c <"$fichier")
-  if [ "$taille" -gt "$limite" ]; then
-    echo "    $fichier — $((taille / 1024)) Kio"
-  fi
-done)
-
-if [ -n "$gros" ]; then
-  echo "" >&2
-  echo "REFUS : fichier de plus de 2 Mio indexe." >&2
-  echo "" >&2
-  echo "$gros" >&2
-  echo "" >&2
-  echo "  L'historique git est definitif : un binaire y reste meme supprime." >&2
-  echo "" >&2
-  exit 1
-fi
-
-# ─── 5. Le verrou suit les manifestes ────────────────────────────────────────
+# ─── 3. Le verrou suit les manifestes ────────────────────────────────────────
 #
 # On ne se contente pas de « package.json indexe donc verrou indexe » : changer
 # un simple script ne touche pas au verrou, et ce raccourci refuserait des
@@ -108,52 +50,12 @@ if [ -n "$manifestes" ]; then
   fi
 fi
 
-# ─── 6. Aucune echappatoire au controle qualite ──────────────────────────────
-#
-# POURQUOI CE CONTROLE VIT ICI, ET NON DANS ESLINT
-#
-# On ne peut pas demander a ESLint d'interdire l'interrupteur qui l'eteint :
-# `/* eslint-disable */` coupe le linter AVANT que la moindre regle ne tourne,
-# `ban-ts-comment` compris. Et `tsc` n'offre aucune option pour refuser un
-# `@ts-nocheck`.
-#
-# Mesure faite le 2026-08-28 : un fichier portant ces deux lignes, avec un
-# parametre non type et un `any`, passait `pnpm lint` ET `pnpm build` sans une
-# seule erreur. Le seul endroit hors de leur portee est ici, sur le texte brut.
-echappatoires=$(git diff --cached -U0 -- '*.ts' '*.js' '*.mjs' '*.cjs' |
-  grep -E '^\+.*(//|/\*+)[[:space:]]*(eslint-disable|@ts-ignore|@ts-nocheck|@ts-expect-error)' || true)
-
-if [ -n "$echappatoires" ]; then
-  echo "" >&2
-  echo "REFUS : echappatoire au controle qualite dans le code indexe." >&2
-  echo "" >&2
-  echo "$echappatoires" | head -10 | sed 's/^/    /' >&2
-  echo "" >&2
-  echo "  Ces commentaires eteignent le linter ou le verificateur de types." >&2
-  echo "  Le code doit satisfaire les regles, pas les faire taire." >&2
-  echo "" >&2
-  echo "  Si une regle est vraiment inadaptee, elle se desactive dans la" >&2
-  echo "  configuration PARTAGEE, avec un motif ecrit — jamais dans un fichier." >&2
-  echo "" >&2
-  exit 1
-fi
-
-# ─── 7. Tout paquet declare ses verrous ──────────────────────────────────────
-#
-# `turbo run test` n'execute que les paquets qui DECLARENT un script `test` —
-# les autres sont ignores en silence, et turbo annonce quand meme un succes.
-# Mesure faite : un `apps/facturation` sans aucun script laissait turbo dire
-# « 3 successful » alors que rien de ce paquet n'avait ete verifie.
-#
-# Un verrou qu'on evite en ne le declarant pas n'est pas un verrou.
-node outils/verifier-paquets.mjs
-
-# ─── 8. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
+# ─── 4. Mise en forme et recherche de secrets, sur l'indexe ──────────────────
 pnpm exec lint-staged
 
-# ─── 9. Lint typé complet ────────────────────────────────────────────────────
+# ─── 5. Types et lint, au niveau du PAQUET ───────────────────────────────────
 #
-# Au niveau du PAQUET, pas du fichier : les regles typees ont besoin du tsconfig
-# du paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls
-# les paquets reellement touches sont relus.
+# Pas au niveau du fichier : les regles typees ont besoin du tsconfig du
+# paquet, qu'un fichier isole ne donne pas. Turbo met en cache, donc seuls les
+# paquets reellement touches sont relus.
 pnpm turbo run typecheck lint
