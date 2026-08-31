@@ -1,0 +1,38 @@
+# CE QUI PART VERS LE DEMON DOCKER, ET RIEN D'AUTRE.
+#
+# ═══ TOUT EST EXCLU, PUIS ON ROUVRE ═══
+#
+# Le meme choix que partout ici : ferme par defaut. Une liste d'exclusions
+# s'oublie — on ajoute un dossier de cache, il part dans le contexte, et
+# personne ne le voit. Une liste d'INCLUSIONS ne s'oublie pas : ce qui manque
+# fait echouer la construction sur un `COPY ... not found`, bruyamment.
+#
+# ═══ CE QUE LES DOCKERFILE COPIENT REELLEMENT ═══
+#
+#   Dockerfile.postgres   `COPY certs/ /tmp/certs/`, et c'est tout.
+#
+# Il n'y a rien d'autre a envoyer. Le reste du depot — node_modules, .git, les
+# dist/, les bacs a sable de Stryker — ne sert a aucune image.
+#
+# ═══ ET SURTOUT : LE `.env` ═══
+#
+# Sans ce fichier, le contexte emportait `.env` a chaque construction. Aucun
+# `COPY` ne le prend, donc il n'entrait dans aucune image — mais il traversait
+# quand meme le demon, et un `COPY . .` ajoute un jour par distraction l'aurait
+# scelle dans une couche. Une couche ne s'efface pas : elle se republie.
+#
+# ═══ AJOUTER UN DOCKERFILE ═══
+#
+# Ouvrir ici ce dont il a besoin, ligne par ligne. Si la construction se plaint
+# d'un fichier introuvable, c'est ce fichier qu'il manque — pas une regle a
+# desactiver.
+*
+!certs
+!certs/**
+
+# CE FICHIER SE ROUVRE LUI-MEME, et ce n'est pas une curiosite : `certs/` n'est
+# pas versionne, donc sur un poste sans interception TLS il n'existe pas, et
+# `COPY certs/` echoue. `Dockerfile.postgres` copie donc `.dockerignore certs*`
+# — au moins une source existe toujours, et le glob peut ne rien trouver sans
+# faire echouer la construction. Le retirer d'ici casse le clone neuf.
+!.dockerignore

@@ -32,36 +32,42 @@
  *
  *  ═══ OU EN EST LA SUITE, MESURE LE 31 AOUT 2026 ═══
  *
- *    admin    45 tues / 341 jouees / 153 ignores
+ *    admin    60 tues / 341 jouees / 153 ignores
  *
- *      contrainte     7 / 130        declencheur   23 / 115
- *      index          5 /  47        politique      7 /  24
- *      fonction       3 /  25
+ *      contrainte     7 / 130        declencheur   24 / 115
+ *      index          5 /  47        politique     20 /  24
+ *      fonction       4 /  25
  *
  *  Ce que chaque banc tue, et ce qu'il couvre :
  *
+ *    cloisonnement.sql           15   les 12 politiques de securite de ligne
+ *    octroi-autorite.sql         11   admin.platform_admin, admin.admin_tenant
  *    commande-signee.sql          7   admin.signed_command
  *    demande-autorite.sql         7   admin.authority_request
- *    octroi-autorite.sql         11   admin.platform_admin, admin.admin_tenant
  *    usurpation.sql               6   admin.impersonation
  *    clone-authentificateur.sql   5   webauthn.authenticator, disarm_clone
  *
- *  Plus `may_operate` et `signs_here`, que les trois bancs d'autorite tuent
- *  ensemble : toute la chaine s'appuie dessus.
+ *  Plus `may_operate` et `signs_here`, que les bancs d'autorite tuent ensemble.
  *
- *  LES 274 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
+ *  LES 281 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
  *  mesure ce qui reste a ecrire, et c'est a cela qu'il sert. En tete de ce qui
  *  manque : `admin.session` et `akeys.key` (le cycle de vie des cles),
  *  `admin.token_pair` (le rejeu de rafraichissement), `audit.event`
  *  (l'immuabilite du journal), `admin.login_flow`, `admin.enrollment_ticket`.
  *
- *  SEPT DES TUES SONT D'UNE AUTRE NATURE, et il faut le savoir en lisant le
- *  rapport : `owner_is_the_vetted_path`, sur sept tables. Aucune assertion ne
- *  les nomme. Les retirer aveugle les fonctions SECURITY DEFINER — qui
- *  s'executent comme `admin_owner`, et non comme le superutilisateur qui se
- *  connecte — et c'est le MONTAGE des bancs qui explose. Tue par dependance,
- *  pas par assertion : la politique porte quelque chose, mais aucune ligne ne
- *  dit quoi.
+ *  ═══ DEUX SORTES DE TUES, ET IL FAUT LES DISTINGUER ═══
+ *
+ *  Neuf `owner_is_the_vetted_path` meurent SANS QU AUCUNE ASSERTION NE LES
+ *  NOMME. Les retirer aveugle les fonctions SECURITY DEFINER — qui s'executent
+ *  comme `admin_owner`, et non comme le superutilisateur qui se connecte — et
+ *  c'est le MONTAGE des bancs qui explose. Tue par dependance, pas par
+ *  assertion : la politique porte quelque chose, mais aucune ligne ne dit quoi.
+ *
+ *  Les `tenant_visible` et `own_or_platform`, eux, sont tues par des assertions
+ *  qui les nomment : `cloisonnement.sql` se connecte comme le role applicatif
+ *  et compte ce qu'il voit. C'est la seule facon de les atteindre — un
+ *  superutilisateur contourne le RLS, donc les cinq autres bancs ne les
+ *  touchaient pas.
  *
  *  ═══ LANCER ═══
  *

@@ -45,17 +45,51 @@ ARG PGTAP_SHA256=d2c951afb296a001d21785611a8e966e3f8fa3f5bfbd929396a5130c0152f31
 # On ajoute au faisceau plutôt que d'installer `ca-certificates` : ce paquet
 # viendrait d'`apk`, qui est précisément ce qui ne marche pas encore.
 #
-# `certs/` est VIDE dans le dépôt — voir `certs/LISEZMOI.md`. Sans interception,
-# le `|| true` fait de cette étape un no-op.
-COPY certs/ /tmp/certs/
+# ═══ POURQUOI `.dockerignore` FIGURE DANS CE `COPY` ═══
+#
+# `certs/` N'EST PAS VERSIONNÉ, délibérément : une autorité d'interception
+# permet à qui la détient de se faire passer pour n'importe quel serveur, et la
+# committer demanderait à tous ceux qui clonent de faire confiance au pare-feu
+# d'une seule entreprise. Chacun pose la sienne, ou aucune.
+#
+# Conséquence : sur un poste qui n'en a pas, le dossier n'existe pas — et un
+# `COPY certs/` échoue alors, sans appel :
+#
+#   ERROR: failed to compute cache key: "/certs": not found
+#
+# Le dépôt fraîchement cloné ne construisait donc pas. Vérifié, pas supposé.
+#
+# UN GLOB NE SUFFIT PAS : `COPY certs*` qui ne correspond à rien échoue tout
+# autant. Il faut qu'au moins UNE source existe toujours, et `.dockerignore` est
+# le seul fichier dont ce contexte garantit la présence — il le définit.
+#
+# Il atterrit donc dans `/tmp/certs/` avec les `.crt`, où il ne gêne personne :
+# le `cat` ne lit que `*.crt`, et le dossier part à la ligne suivante. Sans
+# interception, l'étape est un no-op complet.
+COPY .dockerignore certs* /tmp/certs/
 RUN cat /tmp/certs/*.crt >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true \
  && rm -rf /tmp/certs
 
 # Les outils de construction partent avec `apk del` : ils n'ont rien à faire
 # dans une image qui tourne, et un compilateur présent est un compilateur
 # utilisable.
+# LES VERSIONS SONT EPINGLEES, comme celle de pgTAP juste au-dessus. Cette
+# chaine part avec `apk del` et n'embarque rien — mais elle COMPILE l'extension
+# qui, elle, reste : un compilateur qui change produit un binaire different, et
+# le SHA256 du dessus ne dit rien de ce qui sort du compilateur.
+#
+# `=~` ET NON `=` : `curl=~8.20` accepte 8.20.x-rN. Alpine fait tourner ses
+# revisions — un epinglage exact casserait la construction dans quelques
+# semaines sur un « unable to select packages » que personne ne saurait lire.
+# On fige la version mineure, pas le numero de revision.
 RUN apk add --no-cache --virtual .construction \
-        curl make gcc musl-dev perl patch postgresql17-dev \
+        curl=~8.20 \
+        make=~4.4 \
+        gcc=~15.2 \
+        musl-dev=~1.2 \
+        perl=~5.42 \
+        patch=~2.8 \
+        postgresql17-dev=~17.11 \
  && curl -fsSL -o /tmp/pgtap.tar.gz \
       "https://github.com/theory/pgtap/archive/refs/tags/v${PGTAP_VERSION}.tar.gz" \
  && echo "${PGTAP_SHA256}  /tmp/pgtap.tar.gz" | sha256sum -c - \
