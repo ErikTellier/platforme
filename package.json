@@ -9,6 +9,9 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "migrate": "node packages/harnais/migrer.mjs up",
+    "migrate:down": "node packages/harnais/migrer.mjs down",
+    "migrate:status": "node packages/harnais/migrer.mjs up --dry-run",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "knip": "knip",
@@ -27,6 +30,8 @@
     "husky": "catalog:",
     "knip": "catalog:",
     "lint-staged": "catalog:",
+    "node-pg-migrate": "catalog:",
+    "pg": "catalog:",
     "prettier": "catalog:",
     "secretlint": "catalog:",
     "turbo": "catalog:"

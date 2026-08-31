@@ -1,0 +1,97 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  DEPENDANCES DE DEVELOPPEMENT — Postgres et OpenBao, rien d'autre.
+#
+#  Ce fichier ne porte QUE des services d'infrastructure. Pas d'amorcage, pas
+#  d'outillage : ces deux-la se posent quand il y aura des migrations et des
+#  roles a amorcer, pas avant. Un service de demarrage qui prepare des objets
+#  inexistants est du bruit qu'on finit par croire.
+#
+#  Lance par `docker compose up -d`. Les variables viennent du .env de la
+#  racine — le meme et unique fichier que lisent les services.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    # ═══ POURQUOI alpine, ET POURQUOI ON N'EN CHANGERA PAS ═══
+    #
+    # Ce n'est pas une question de taille. Passer sur l'image Debian ferait
+    # passer le serveur de musl a la glibc, donc changer de bibliotheque de
+    # COLLATION sous un `pgdata` deja ecrit.
+    #
+    # Un index sur du texte est trie selon la collation qui existait a sa
+    # creation. En changer sans reindexer laisse des index dont l'ordre ne
+    # correspond plus a celui du serveur : les recherches par intervalle
+    # rendent des resultats INCOMPLETS, sans erreur et sans avertissement.
+    #
+    # Corollaire : le jour ou pgTAP sera necessaire, il faudra une image a nous
+    # — l'extension vit dans le SERVEUR, aucune image officielle ne la porte.
+    # Cette image-la devra partir de `postgres:17-alpine`, pas d'autre chose.
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?manquant — copier .env.example en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?manquant — copier .env.example en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?manquant — copier .env.example en .env}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` et non un `nc` sur le port : le serveur ouvre son port
+      # avant d'accepter des connexions, et un service qui demarre sur cette
+      # foi echoue une fois sur trois.
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  bao:
+    # ═══ MODE DEV : TOUT EST EN MEMOIRE ═══
+    #
+    # Les moteurs de secrets, les cles et les baux disparaissent a chaque
+    # redemarrage du conteneur. C'est voulu en developpement — mais ca signifie
+    # qu'un service de reamorcage sera necessaire des qu'on activera un moteur
+    # (`transit` pour le chiffrement, `database` pour les comptes ephemeres).
+    #
+    # Tant qu'aucun moteur n'est utilise, il n'y a rien a reposer.
+    image: openbao/openbao:latest
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: ${BAO_ROOT_TOKEN:?manquant — copier .env.example en .env}
+      BAO_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      BAO_ADDR: http://127.0.0.1:8200
+    ports:
+      - '${BAO_PORT:-8200}:8200'
+    cap_add:
+      # Permet a OpenBao de verrouiller sa memoire pour qu'elle ne parte pas
+      # dans le fichier d'echange. Sans cette capacite il demarre quand meme,
+      # en le signalant bruyamment a chaque fois.
+      - IPC_LOCK
+    healthcheck:
+      test: ['CMD', 'bao', 'status']
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  # AMORÇAGE — une base par dossier de migrations/.
+  #
+  # Le script est MONTE plutot que recopie dans l'image : il se lit et se
+  # modifie comme le reste du depot, sans reconstruction.
+  #
+  # Il tourne a chaque `up` et non par /docker-entrypoint-initdb.d/, qui ne
+  # s'execute qu'a la premiere initialisation du volume — un service ajoute
+  # plus tard n'aurait jamais sa base.
+  db-init:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:?manquant}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?manquant}
+    volumes:
+      - ./migrations:/migrations:ro
+    entrypoint: ['sh', '/migrations/amorcer.sh']
+    restart: 'no'
+
+volumes:
+  pgdata:
