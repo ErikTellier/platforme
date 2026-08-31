@@ -424,11 +424,15 @@ CREATE VIEW api.command_batch AS
   SELECT id, user_id, session_id, challenge_id, scope, target_tenant_id,
          manifest_digest, declared_count, issued_at
     FROM admin.command_batch;
-CREATE VIEW api.batch_estate AS
+CREATE VIEW api.batch_estate
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, scope, target_tenant_id, issued_at, declared_count, written,
          missing
     FROM admin.batch_estate;
-CREATE VIEW api.batch_incomplete AS
+CREATE VIEW api.batch_incomplete
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, scope, target_tenant_id, issued_at, declared_count, written,
          missing
     FROM admin.batch_incomplete;

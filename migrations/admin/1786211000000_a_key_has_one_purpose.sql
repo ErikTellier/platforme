@@ -103,7 +103,9 @@ COMMENT ON INDEX akeys.uq_key_one_active_per_purpose IS
 -- ---------------------------------------------------------------------
 -- Les vues portent l'usage : sans lui, l'appelant ne peut pas choisir.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW akeys.signing_key AS
+CREATE OR REPLACE VIEW akeys.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.session_id, k.state, k.public_jwk,
          k.created_at, k.activated_at, k.signs_until, k.published_until,
          k.purpose
@@ -114,21 +116,27 @@ CREATE OR REPLACE VIEW akeys.signing_key AS
      AND now() < k.signs_until
      AND s.ended_at IS NULL;
 
-CREATE OR REPLACE VIEW akeys.signing_material AS
+CREATE OR REPLACE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
   FROM akeys.key
   WHERE state = 'ACTIVE'
     AND private_destroyed_at IS NULL
     AND now() < signs_until;
 
-CREATE OR REPLACE VIEW akeys.destroyable_key AS
+CREATE OR REPLACE VIEW akeys.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
   FROM akeys.key
   WHERE private_destroyed_at IS NULL
     AND now() >= signs_until;
 
 -- Le JWKS ne publie que ce qu'un service souverain doit vérifier.
-CREATE OR REPLACE VIEW akeys.verifiable_key AS
+CREATE OR REPLACE VIEW akeys.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until, purpose
   FROM akeys.key
   WHERE state = 'ACTIVE'
@@ -141,23 +149,33 @@ COMMENT ON VIEW akeys.verifiable_key IS
 -- ---------------------------------------------------------------------
 -- Le contrat applicatif. Ces vues ont été écrites en SELECT *, qui fige.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW api.key AS
+CREATE OR REPLACE VIEW api.key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, kms_ref, created_at,
          activated_at, signs_until, published_until, private_destroyed_at,
          purpose
     FROM akeys.key;
 
-CREATE OR REPLACE VIEW api.signing_key AS
+CREATE OR REPLACE VIEW api.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, created_at, activated_at,
          signs_until, published_until, purpose
     FROM akeys.signing_key;
-CREATE OR REPLACE VIEW api.signing_material AS
+CREATE OR REPLACE VIEW api.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
     FROM akeys.signing_material;
-CREATE OR REPLACE VIEW api.destroyable_key AS
+CREATE OR REPLACE VIEW api.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
     FROM akeys.destroyable_key;
-CREATE OR REPLACE VIEW api.verifiable_key AS
+CREATE OR REPLACE VIEW api.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until, purpose
     FROM akeys.verifiable_key;
 
@@ -181,7 +199,9 @@ SET ROLE admin_owner;
 -- la détruire, donc de reposer ses droits colonne par colonne.
 DROP VIEW api.key;
 
-CREATE VIEW api.key AS
+CREATE VIEW api.key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, kms_ref, created_at,
          activated_at, signs_until, published_until, private_destroyed_at
     FROM akeys.key;
@@ -205,7 +225,9 @@ DROP VIEW akeys.destroyable_key;
 DROP VIEW akeys.signing_material;
 DROP VIEW akeys.signing_key;
 
-CREATE VIEW akeys.signing_key AS
+CREATE VIEW akeys.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.session_id, k.state, k.public_jwk,
          k.created_at, k.activated_at, k.signs_until, k.published_until
     FROM akeys.key AS k
@@ -215,36 +237,50 @@ CREATE VIEW akeys.signing_key AS
      AND now() < k.signs_until
      AND s.ended_at IS NULL;
 
-CREATE VIEW akeys.signing_material AS
+CREATE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
   FROM akeys.key
   WHERE state = 'ACTIVE'
     AND private_destroyed_at IS NULL
     AND now() < signs_until;
 
-CREATE VIEW akeys.destroyable_key AS
+CREATE VIEW akeys.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
   FROM akeys.key
   WHERE private_destroyed_at IS NULL
     AND now() >= signs_until;
 
-CREATE VIEW akeys.verifiable_key AS
+CREATE VIEW akeys.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until
   FROM akeys.key
   WHERE state = 'ACTIVE'
     AND now() < published_until;
 
-CREATE VIEW api.signing_key AS
+CREATE VIEW api.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, created_at, activated_at,
          signs_until, published_until
     FROM akeys.signing_key;
-CREATE VIEW api.signing_material AS
+CREATE VIEW api.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
     FROM akeys.signing_material;
-CREATE VIEW api.destroyable_key AS
+CREATE VIEW api.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
     FROM akeys.destroyable_key;
-CREATE VIEW api.verifiable_key AS
+CREATE VIEW api.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until
     FROM akeys.verifiable_key;
 

@@ -56,7 +56,9 @@ SET ROLE admin_owner;
 
 -- La vue cesse de publier une clé dont la session est fermée. Les colonnes ne
 -- changent pas, donc `CREATE OR REPLACE` suffit et les droits sont conservés.
-CREATE OR REPLACE VIEW akeys.signing_key AS
+CREATE OR REPLACE VIEW akeys.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.session_id, k.state, k.public_jwk,
          k.created_at, k.activated_at, k.signs_until, k.published_until
     FROM akeys.key AS k
@@ -196,7 +198,9 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE VIEW akeys.signing_key AS
+CREATE OR REPLACE VIEW akeys.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk,
          created_at, activated_at, signs_until, published_until
     FROM akeys.key

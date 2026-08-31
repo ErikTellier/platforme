@@ -182,7 +182,9 @@ CREATE VIEW api.authority_request AS
          withdrawn_at, withdrawn_by
     FROM admin.authority_request;
 
-CREATE VIEW api.pending_request AS
+CREATE VIEW api.pending_request
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, scope, tenant_id, subject_user_id, reason, expires_at, requested_at,
          requested_by, waiting
     FROM admin.pending_request;

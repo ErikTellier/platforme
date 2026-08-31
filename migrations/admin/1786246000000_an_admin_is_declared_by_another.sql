@@ -233,8 +233,30 @@ RESET ROLE;
 
 SET ROLE admin_owner;
 
-CREATE OR REPLACE VIEW api."user" AS
+-- DÉTRUIRE PUIS RECRÉER, ET NON `CREATE OR REPLACE`.
+--
+-- `CREATE OR REPLACE VIEW` sait ajouter une colonne, jamais en retirer :
+-- Postgres refuse avec « cannot drop columns from view ». Le retour de cette
+-- migration en enlève deux, il ne peut donc pas passer par là. Constaté en
+-- exécutant `migrate:down` pour la première fois — ce retour n'avait jamais
+-- été joué.
+--
+-- ET REPOSER LES DROITS. Un `DROP` emporte l'ACL avec l'objet. Sans les deux
+-- GRANT qui suivent, la vue revient muette pour `app_admin_plane` : le plan
+-- d'administration perdrait la lecture des utilisateurs, et aucune migration
+-- n'aurait dit pourquoi. Ces droits sont posés par `initial_schema` ; c'est à
+-- ce retour de les rendre, puisque c'est lui qui les détruit.
+--
+-- Pas de `CASCADE` : rien ne dépendait de cette vue quand ce retour a été
+-- écrit, et un CASCADE détruirait en silence ce qu'on n'aurait pas vu venir.
+-- S'il échoue un jour sur une dépendance, c'est une information.
+DROP VIEW api."user";
+
+CREATE VIEW api."user" AS
 SELECT id, created_at, deactivated_at FROM admin."user";
+
+GRANT SELECT ON api."user" TO app_admin_plane;
+GRANT UPDATE (deactivated_at) ON api."user" TO app_admin_plane;
 
 DROP FUNCTION admin.provision_admin(text, text, uuid, uuid);
 

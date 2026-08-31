@@ -177,7 +177,19 @@ $$;
 -- Une vue fige sa liste de colonnes à la création : ajouter la colonne à la
 -- table ne l'y fait pas entrer. `CREATE OR REPLACE` ne sait qu'AJOUTER à la fin,
 -- ce qui suffit ici et garantit qu'aucune position existante ne bouge.
-CREATE OR REPLACE VIEW api.authority_request AS
+-- `WITH` EST OBLIGATOIRE ICI, MEME EN REMPLACEMENT.
+--
+-- `CREATE OR REPLACE VIEW` REINITIALISE les options de la vue : l'omettre ne
+-- « garde pas l'existant », il l'efface. La vue retombe alors en
+-- `security_definer` implicite et s'execute avec les droits de son
+-- proprietaire, `admin_owner` — a qui la politique `owner_is_the_vetted_path`
+-- rend `true` sans condition. Le plan devient un `Seq Scan` SANS filtre, et
+-- toutes les lignes de tous les clients remontent.
+--
+-- Constate en base, plan a l'appui : l'option avait disparu de trois vues.
+CREATE OR REPLACE VIEW api.authority_request
+    WITH (security_invoker = TRUE)
+AS
 SELECT id, scope, tenant_id, subject_user_id, reason, expires_at,
        requested_at, requested_by, request_command_id,
        approved_at, approved_by, approval_command_id,
@@ -201,12 +213,44 @@ RESET ROLE;
 
 SET ROLE admin_owner;
 
-CREATE OR REPLACE VIEW api.authority_request AS
+-- DÉTRUIRE PUIS RECRÉER, ET NON `CREATE OR REPLACE`.
+--
+-- `CREATE OR REPLACE VIEW` sait ajouter une colonne à la fin, jamais en
+-- retirer : Postgres refuse avec « cannot drop columns from view ». Ce retour
+-- en enlève une, il ne peut donc pas passer par là. Constaté en exécutant
+-- `migrate:down` pour la première fois — ce retour n'avait jamais été joué.
+--
+-- ET `security_invoker` EST REPOSÉ EXPLICITEMENT. C'est `an_approval_is_not_a_request`
+-- qui l'avait posé, et un `CREATE VIEW` nu ne l'hérite pas. Sans lui, la vue
+-- s'exécute avec les droits de `admin_owner`, à qui la politique
+-- `owner_is_the_vetted_path` rend `true` sans condition : le plan devient
+-- `Seq Scan` SANS filtre, et toutes les lignes de tous les clients remontent.
+-- Mesuré, plan à l'appui. C'est exactement ce que l'oubli du `WITH` dans la
+-- montée de cette migration a provoqué en base.
+--
+-- ET L'ACL EST RENDUE. Un `DROP` emporte les droits avec l'objet ; il faut les
+-- reposer colonne par colonne. `withdrawal_command_id` en est absent
+-- volontairement : c'est la colonne que ce retour supprime.
+DROP VIEW api.authority_request;
+
+CREATE VIEW api.authority_request
+    WITH (security_invoker = TRUE)
+AS
 SELECT id, scope, tenant_id, subject_user_id, reason, expires_at,
        requested_at, requested_by, request_command_id,
        approved_at, approved_by, approval_command_id,
        withdrawn_at, withdrawn_by
   FROM admin.authority_request;
+
+GRANT SELECT ON api.authority_request TO app_admin_plane;
+
+GRANT INSERT (scope, tenant_id, subject_user_id, reason, expires_at,
+              requested_by, request_command_id)
+  ON api.authority_request TO app_admin_plane;
+
+GRANT UPDATE (approved_at, approved_by, approval_command_id,
+              withdrawn_at, withdrawn_by)
+  ON api.authority_request TO app_admin_plane;
 
 CREATE OR REPLACE FUNCTION admin.request_is_signed()
 RETURNS trigger

@@ -64,7 +64,9 @@ SET ROLE admin_owner;
 
 -- CREATE OR REPLACE sait ajouter en queue : les colonnes existantes gardent leur
 -- nom, leur ordre et leur type, donc rien de ce qui lit déjà ne bouge.
-CREATE OR REPLACE VIEW api.challenge AS
+CREATE OR REPLACE VIEW api.challenge
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, session_id, challenge, action, created_at, expires_at,
          consumed_at, scope, target_tenant_id
     FROM webauthn.challenge;
@@ -95,7 +97,9 @@ GRANT INSERT ON api.challenge TO app_admin_plane;
 
 -- Rétrécir une vue exige de la détruire, donc de reposer TOUS ses droits.
 DROP VIEW api.challenge;
-CREATE VIEW api.challenge AS
+CREATE VIEW api.challenge
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, session_id, challenge, action, created_at, expires_at,
          consumed_at
     FROM webauthn.challenge;

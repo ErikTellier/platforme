@@ -157,7 +157,18 @@ AS $$
        AND (t.expires_at IS NULL OR now() < t.expires_at));
 $$;
 
+-- `WITH` EST OBLIGATOIRE ICI, MEME EN REMPLACEMENT.
+--
+-- `CREATE OR REPLACE VIEW` REINITIALISE les options de la vue : l'omettre ne
+-- « garde pas l'existant », il l'efface. La vue retombe alors en
+-- `security_definer` implicite et s'execute avec les droits de son
+-- proprietaire, `admin_owner` — a qui la politique `owner_is_the_vetted_path`
+-- rend `true` sans condition. Le plan devient un `Seq Scan` SANS filtre, et
+-- toutes les lignes de tous les clients remontent.
+--
+-- Constate en base, plan a l'appui : l'option avait disparu de trois vues.
 CREATE OR REPLACE VIEW admin.effective_authority
+    WITH (security_invoker = TRUE)
 AS
  SELECT u.id AS user_id, 'PLATFORM'::text AS scope, NULL::uuid AS tenant_id,
         p.granted_at, p.granted_by, p.approved_by, p.break_glass, p.reason,
@@ -181,7 +192,18 @@ ne porte pas de terme — c''est-à-dire dans le cas normal. Une interface qui
 affichait un décompte doit lire NULL comme « jusqu''à révocation », jamais
 comme « expiré ».';
 
+-- `WITH` EST OBLIGATOIRE ICI, MEME EN REMPLACEMENT.
+--
+-- `CREATE OR REPLACE VIEW` REINITIALISE les options de la vue : l'omettre ne
+-- « garde pas l'existant », il l'efface. La vue retombe alors en
+-- `security_definer` implicite et s'execute avec les droits de son
+-- proprietaire, `admin_owner` — a qui la politique `owner_is_the_vetted_path`
+-- rend `true` sans condition. Le plan devient un `Seq Scan` SANS filtre, et
+-- toutes les lignes de tous les clients remontent.
+--
+-- Constate en base, plan a l'appui : l'option avait disparu de trois vues.
 CREATE OR REPLACE VIEW admin.break_glass_use
+    WITH (security_invoker = TRUE)
 AS
  SELECT 'PLATFORM'::text AS scope, NULL::uuid AS tenant_id,
         p.user_id, p.granted_by, p.granted_at, p.expires_at, p.reason,
@@ -330,7 +352,18 @@ BEGIN
 END;
 $$;
 
+-- `WITH` EST OBLIGATOIRE ICI, MEME EN REMPLACEMENT.
+--
+-- `CREATE OR REPLACE VIEW` REINITIALISE les options de la vue : l'omettre ne
+-- « garde pas l'existant », il l'efface. La vue retombe alors en
+-- `security_definer` implicite et s'execute avec les droits de son
+-- proprietaire, `admin_owner` — a qui la politique `owner_is_the_vetted_path`
+-- rend `true` sans condition. Le plan devient un `Seq Scan` SANS filtre, et
+-- toutes les lignes de tous les clients remontent.
+--
+-- Constate en base, plan a l'appui : l'option avait disparu de trois vues.
 CREATE OR REPLACE VIEW admin.break_glass_use
+    WITH (security_invoker = TRUE)
 AS
  SELECT 'PLATFORM'::text AS scope, NULL::uuid AS tenant_id,
         p.user_id, p.granted_by, p.granted_at, p.expires_at, p.reason,
@@ -342,7 +375,18 @@ UNION ALL
         (t.revoked_at IS NULL AND now() < t.expires_at)
    FROM admin.admin_tenant AS t WHERE t.break_glass;
 
+-- `WITH` EST OBLIGATOIRE ICI, MEME EN REMPLACEMENT.
+--
+-- `CREATE OR REPLACE VIEW` REINITIALISE les options de la vue : l'omettre ne
+-- « garde pas l'existant », il l'efface. La vue retombe alors en
+-- `security_definer` implicite et s'execute avec les droits de son
+-- proprietaire, `admin_owner` — a qui la politique `owner_is_the_vetted_path`
+-- rend `true` sans condition. Le plan devient un `Seq Scan` SANS filtre, et
+-- toutes les lignes de tous les clients remontent.
+--
+-- Constate en base, plan a l'appui : l'option avait disparu de trois vues.
 CREATE OR REPLACE VIEW admin.effective_authority
+    WITH (security_invoker = TRUE)
 AS
  SELECT u.id AS user_id, 'PLATFORM'::text AS scope, NULL::uuid AS tenant_id,
         p.granted_at, p.granted_by, p.approved_by, p.break_glass, p.reason,

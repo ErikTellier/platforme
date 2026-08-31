@@ -145,14 +145,18 @@ CREATE TRIGGER no_delete_provider   BEFORE DELETE ON admin.identity_provider
 -- ---------------------------------------------------------------------
 -- 5. Rebuild the contract, unchanged in shape.
 -- ---------------------------------------------------------------------
-CREATE VIEW admin.live_session AS
+CREATE VIEW admin.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session
    WHERE ended_at IS NULL AND now() < absolute_expires_at;
 COMMENT ON VIEW admin.live_session IS
   'A session is live only within its 1 h absolute ceiling. Past it, it is dead even without an explicit ended_at — expiry is derived from now(), never a cron.';
 
-CREATE VIEW admin.live_pair AS
+CREATE VIEW admin.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT p.id, p.session_id, p.jti_bearer, p.jti_refresh, p.issued_at,
          p.inactivity_expires_at, p.replaced_at
   FROM admin.token_pair AS p
@@ -161,16 +165,24 @@ CREATE VIEW admin.live_pair AS
 COMMENT ON VIEW admin.live_pair IS
   'A pair is refreshable only if not replaced, within its 15 min inactivity window, AND its session is within the 1 h ceiling. Both bounds, derived from now().';
 
-CREATE VIEW api.session AS
+CREATE VIEW api.session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session;
-CREATE VIEW api.identity AS
+CREATE VIEW api.identity
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, provider, provider_id, provision_key, created_at, bound_at
     FROM admin.identity;
-CREATE VIEW api.live_session AS
+CREATE VIEW api.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.live_session;
-CREATE VIEW api.live_pair AS
+CREATE VIEW api.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, session_id, jti_bearer, jti_refresh, issued_at, inactivity_expires_at,
          replaced_at
     FROM admin.live_pair;
@@ -224,26 +236,38 @@ ALTER TABLE admin.identity
   USING provider::admin.identity_provider,
   ALTER COLUMN provider SET DEFAULT 'ENTRA';
 
-CREATE VIEW admin.live_session AS
+CREATE VIEW admin.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session
    WHERE ended_at IS NULL AND now() < absolute_expires_at;
-CREATE VIEW admin.live_pair AS
+CREATE VIEW admin.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT p.id, p.session_id, p.jti_bearer, p.jti_refresh, p.issued_at,
          p.inactivity_expires_at, p.replaced_at
   FROM admin.token_pair AS p
   INNER JOIN admin.live_session AS s ON p.session_id = s.id
   WHERE p.replaced_at IS NULL AND now() < p.inactivity_expires_at;
-CREATE VIEW api.session AS
+CREATE VIEW api.session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session;
-CREATE VIEW api.identity AS
+CREATE VIEW api.identity
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, provider, provider_id, provision_key, created_at, bound_at
     FROM admin.identity;
-CREATE VIEW api.live_session AS
+CREATE VIEW api.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.live_session;
-CREATE VIEW api.live_pair AS
+CREATE VIEW api.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, session_id, jti_bearer, jti_refresh, issued_at, inactivity_expires_at,
          replaced_at
     FROM admin.live_pair;

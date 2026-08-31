@@ -115,7 +115,9 @@ un catalogue.';
 
 -- La borne de session, oubliée ici quand signing_key l'a reçue. Les colonnes ne
 -- changent pas, donc CREATE OR REPLACE suffit et les droits sont conservés.
-CREATE OR REPLACE VIEW akeys.signing_material AS
+CREATE OR REPLACE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.kms_ref, k.signs_until, k.purpose
     FROM akeys.key AS k
     INNER JOIN admin.session AS s ON k.session_id = s.id
@@ -147,7 +149,9 @@ RESET ROLE;
 
 SET ROLE admin_owner;
 
-CREATE OR REPLACE VIEW akeys.signing_material AS
+CREATE OR REPLACE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
   FROM akeys.key
   WHERE state = 'ACTIVE'

@@ -26,7 +26,12 @@ services:
     # Corollaire : le jour ou pgTAP sera necessaire, il faudra une image a nous
     # — l'extension vit dans le SERVEUR, aucune image officielle ne la porte.
     # Cette image-la devra partir de `postgres:17-alpine`, pas d'autre chose.
-    image: postgres:17-alpine
+    # L'IMAGE PORTE pgTAP — voir Dockerfile.postgres. Elle part de
+    # postgres:17-alpine, la meme base qu'avant : aucun changement de
+    # collation sous un pgdata deja ecrit.
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?manquant — copier .env.example en .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?manquant — copier .env.example en .env}

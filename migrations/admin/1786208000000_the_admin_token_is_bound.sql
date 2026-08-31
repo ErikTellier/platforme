@@ -114,7 +114,9 @@ COMMENT ON VIEW admin.unbound_session IS
 liaison est facultative en base et obligatoire à la bordure : cette vue est ce
 qui empêche « obligatoire à la bordure » de rester une phrase.';
 
-CREATE VIEW api.unbound_session AS
+CREATE VIEW api.unbound_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at
     FROM admin.unbound_session;
 GRANT SELECT ON api.unbound_session TO app_admin_plane;
@@ -122,7 +124,9 @@ GRANT SELECT ON api.unbound_session TO app_admin_plane;
 -- La vue que l'application lit porte la colonne, sinon la liaison existe et
 -- personne ne peut l'écrire — le trou exact qu'`api.identity` avait avec
 -- `connection_id`.
-CREATE OR REPLACE VIEW api.session AS
+CREATE OR REPLACE VIEW api.session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason,
          cnf_jkt
     FROM admin.session;
@@ -150,7 +154,9 @@ DROP VIEW admin.unbound_session;
 -- qu'on a sous les yeux : le droit de colonne sur `ended_at, end_reason` est ce
 -- qui permet de fermer une session, et l'oublier ne se voit qu'au test.
 DROP VIEW api.session;
-CREATE VIEW api.session AS
+CREATE VIEW api.session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session;
 GRANT SELECT, INSERT ON api.session TO app_admin_plane;

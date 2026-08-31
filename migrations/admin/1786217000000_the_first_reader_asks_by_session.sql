@@ -49,7 +49,9 @@ SET LOCAL statement_timeout = '60s';
 
 SET ROLE admin_owner;
 
-CREATE OR REPLACE VIEW akeys.signing_material AS
+CREATE OR REPLACE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.kms_ref, k.signs_until, k.purpose,
          k.session_id
     FROM akeys.key AS k
@@ -65,7 +67,9 @@ fait tourner une paire. Sans elle, l''appelant joint sur user_id et doit savoir
 que uq_session_mono rend ça non ambigu — une correction qui vit dans sa tête
 plutôt que dans le schéma.';
 
-CREATE OR REPLACE VIEW api.signing_material AS
+CREATE OR REPLACE VIEW api.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose, session_id
     FROM akeys.signing_material;
 
@@ -81,7 +85,9 @@ SET ROLE admin_owner;
 DROP VIEW api.signing_material;
 DROP VIEW akeys.signing_material;
 
-CREATE VIEW akeys.signing_material AS
+CREATE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT k.id, k.kid, k.user_id, k.kms_ref, k.signs_until, k.purpose
     FROM akeys.key AS k
     INNER JOIN admin.session AS s ON k.session_id = s.id
@@ -98,7 +104,9 @@ inatteignable, comme la clé elle-même a cessé de pouvoir signer. Avec
 destroyable_key, kms_ref est lisible exactement deux fois dans la vie d''une
 clé — pendant qu''elle signe, et pendant qu''on la détruit.';
 
-CREATE VIEW api.signing_material AS
+CREATE VIEW api.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until, purpose
     FROM akeys.signing_material;
 

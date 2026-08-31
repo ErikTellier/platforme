@@ -505,6 +505,48 @@ BEGIN
     END LOOP;
 END $$;
 
+-- =====================================================================
+--  LE PRIX DE `security_invoker`, ET POURQUOI ON LE PAIE
+--
+--  Une vue de `api` s'execute avec les droits de SON APPELANT. C'est ce qui
+--  la fait tomber sous `own_or_platform` ou `tenant_visible` plutot que sous
+--  `owner_is_the_vetted_path` — donc ce qui la filtre.
+--
+--  Mais lire par une vue en `security_invoker` exige le privilege sur la
+--  TABLE aussi, pas seulement sur la vue. Sans ces GRANT, l'appelant se voit
+--  repondre « permission denied for table session » : la fuite devient un
+--  refus, ce qui est mieux, mais la vue ne sert plus a rien.
+--
+--  CE QUE CES GRANT N'ELARGISSENT PAS. Chacune de ces vues expose DEJA toutes
+--  les colonnes de sa table — sept sur sept, dix sur dix. Le privilege de
+--  table ne montre donc rien que la vue ne montrait pas, et les politiques
+--  continuent de trancher ligne par ligne.
+--
+--  Les privileges sont ceux, exactement, que le role detient sur la vue
+--  correspondante. Ni plus, ni moins.
+-- =====================================================================
+
+GRANT INSERT, SELECT ON admin.identity TO app_admin_plane;
+GRANT UPDATE (provider_id, provision_key) ON admin.identity TO app_admin_plane;
+
+GRANT INSERT, SELECT ON admin.session TO app_admin_plane;
+GRANT UPDATE (cnf_jkt, end_reason, ended_at) ON admin.session TO app_admin_plane;
+
+GRANT INSERT, SELECT ON admin.token_pair TO app_admin_plane;
+
+GRANT INSERT, SELECT ON admin.operator_residency TO app_admin_plane;
+GRANT UPDATE (revoked_at, revoked_by, revoked_command_id)
+  ON admin.operator_residency TO app_admin_plane;
+
+GRANT INSERT, SELECT ON admin.tenant_residency TO app_admin_plane;
+
+GRANT INSERT, SELECT ON webauthn.authenticator TO app_admin_plane;
+GRANT UPDATE (revoked_at) ON webauthn.authenticator TO app_admin_plane;
+
+GRANT DELETE, SELECT ON webauthn.challenge TO app_admin_plane;
+GRANT INSERT (action, challenge, expires_at, scope, session_id, target_tenant_id, user_id)
+  ON webauthn.challenge TO app_admin_plane;
+
 -- --- L'axe client -----------------------------------------------------
 
 CREATE POLICY tenant_visible ON admin.admin_tenant
@@ -633,17 +675,25 @@ opérateur n''y découvre pas l''existence de clients hors de sa portée.';
 CREATE VIEW api.residency_region AS
   SELECT code, description, jurisdiction, deprecated_at
     FROM admin.residency_region;
-CREATE VIEW api.tenant_residency AS
+CREATE VIEW api.tenant_residency
+    WITH (security_invoker = TRUE)
+AS
   SELECT tenant_id, region_code, declared_at, declared_by, command_id
     FROM admin.tenant_residency;
-CREATE VIEW api.operator_residency AS
+CREATE VIEW api.operator_residency
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, region_code, reason, granted_at, granted_by, command_id,
          revoked_at, revoked_by, revoked_command_id
     FROM admin.operator_residency;
-CREATE VIEW api.residency_map AS
+CREATE VIEW api.residency_map
+    WITH (security_invoker = TRUE)
+AS
   SELECT region, jurisdiction, tenants, operators
     FROM admin.residency_map;
-CREATE VIEW api.tenant_without_residency AS
+CREATE VIEW api.tenant_without_residency
+    WITH (security_invoker = TRUE)
+AS
   SELECT tenant_id, first_scoped_at
     FROM admin.tenant_without_residency;
 
@@ -685,6 +735,12 @@ DROP VIEW api.tenant_residency;
 DROP VIEW api.residency_region;
 DROP VIEW admin.tenant_without_residency;
 DROP VIEW admin.residency_map;
+
+-- Les privileges de table qu'exige `security_invoker` — voir la montee.
+REVOKE ALL ON admin.identity, admin.session, admin.token_pair,
+              admin.operator_residency, admin.tenant_residency,
+              webauthn.authenticator, webauthn.challenge
+  FROM app_admin_plane;
 
 DROP POLICY own_or_platform ON webauthn.challenge;
 DROP POLICY own_or_platform ON admin.token_pair;

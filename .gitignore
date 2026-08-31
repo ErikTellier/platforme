@@ -57,6 +57,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Autorites de certification locales — voir certs/LISEZMOI.md.
+# Une autorite d'interception ne se partage pas : chacun pose la sienne.
+certs/
+
 # Misc
 .DS_Store
 *.pem

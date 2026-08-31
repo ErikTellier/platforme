@@ -97,7 +97,21 @@ fi
 # pendant qu'on travaille. Le laisser derriere soi ne l'est plus.
 pnpm knip
 
-# ─── 6. Lint, types, tests, mutation, construction ───────────────────────────
+# ─── 6. La doctrine, verifiee sur la base vivante ────────────────────────────
+#
+# Une migration decrit ce qu'elle POSE ; elle ne dit rien de ce qu'une suivante
+# a defait sans le vouloir. Vingt-six vues avaient perdu `security_invoker`
+# ainsi — chacune correcte isolement, l'ensemble faux.
+#
+# Exige une base migree. Elle n'est pas toujours la : le banc SAUTE plutot que
+# de rougir, sinon on pousserait sans lui par lassitude.
+if pnpm exec node -e "process.exit(0)" >/dev/null 2>&1 && pnpm migrate:status >/dev/null 2>&1; then
+  pnpm test:db
+else
+  echo "  doctrine : base injoignable, banc saute" >&2
+fi
+
+# ─── 7. Lint, types, tests, mutation, construction ───────────────────────────
 #
 # `mutation` ferme la derniere porte : la couverture prouve qu une ligne a ete
 # EXECUTEE, jamais qu un test l AFFIRME. Stryker casse le code et verifie qu un

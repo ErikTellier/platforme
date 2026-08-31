@@ -433,14 +433,18 @@ CREATE VIEW admin.active_user AS
     FROM admin."user"
    WHERE deactivated_at IS NULL;
 
-CREATE VIEW admin.live_session AS
+CREATE VIEW admin.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session
    WHERE ended_at IS NULL AND now() < absolute_expires_at;
 COMMENT ON VIEW admin.live_session IS
   'A session is live only within its 1 h absolute ceiling. Past it, it is dead even without an explicit ended_at — expiry is derived from now(), never a cron.';
 
-CREATE VIEW admin.live_pair AS
+CREATE VIEW admin.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT p.id, p.session_id, p.jti_bearer, p.jti_refresh, p.issued_at,
          p.inactivity_expires_at, p.replaced_at
   FROM admin.token_pair AS p
@@ -452,7 +456,9 @@ COMMENT ON VIEW admin.live_pair IS
 
 -- Explicit column lists, never SELECT *: kms_ref must never be published by a
 -- view simply because it happens to be a column of the table underneath.
-CREATE VIEW akeys.signing_key AS
+CREATE VIEW akeys.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk,
          created_at, activated_at, signs_until, published_until
   FROM akeys.key
@@ -462,7 +468,9 @@ CREATE VIEW akeys.signing_key AS
 COMMENT ON VIEW akeys.signing_key IS
   'WHICH key an admin may currently sign with. At most one row per admin. Carries no kms_ref: observing rotation is not the same right as signing.';
 
-CREATE VIEW akeys.signing_material AS
+CREATE VIEW akeys.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
   FROM akeys.key
   WHERE state = 'ACTIVE'
@@ -471,7 +479,9 @@ CREATE VIEW akeys.signing_material AS
 COMMENT ON VIEW akeys.signing_material IS
   'HOW to sign. The single readable path to kms_ref — SELECT on that column is revoked at table level. Same predicate as signing_key: the KMS reference of a destroyed or expired key is unreachable, so a compromised connection cannot walk the key history looking for material that outlived its window.';
 
-CREATE VIEW akeys.destroyable_key AS
+CREATE VIEW akeys.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
   FROM akeys.key
   WHERE private_destroyed_at IS NULL
@@ -479,7 +489,9 @@ CREATE VIEW akeys.destroyable_key AS
 COMMENT ON VIEW akeys.destroyable_key IS
   'Keys whose signing window has closed but whose KMS material still exists. The rotation path reads this, destroys each reference, then posts private_destroyed_at. Together with signing_material, kms_ref is readable exactly twice in a key''s life — while it signs, and while it is being destroyed — and never in between or after.';
 
-CREATE VIEW akeys.verifiable_key AS
+CREATE VIEW akeys.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until
   FROM akeys.key
   WHERE state = 'ACTIVE'
@@ -931,27 +943,39 @@ COMMENT ON SCHEMA api IS
 
 CREATE VIEW api."user" AS
   SELECT id, created_at, deactivated_at FROM admin."user";
-CREATE VIEW api.identity AS
+CREATE VIEW api.identity
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, provider, provider_id, provision_key, created_at, bound_at
     FROM admin.identity;
-CREATE VIEW api.session AS
+CREATE VIEW api.session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.session;
-CREATE VIEW api.token_pair AS
+CREATE VIEW api.token_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, session_id, jti_bearer, jti_refresh, issued_at,
          inactivity_expires_at, replaced_at
     FROM admin.token_pair;
-CREATE VIEW api.authenticator AS
+CREATE VIEW api.authenticator
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, credential_id, public_key, sign_count, label,
          created_at, revoked_at
     FROM webauthn.authenticator;
-CREATE VIEW api.challenge AS
+CREATE VIEW api.challenge
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, session_id, challenge, action, created_at, expires_at,
          consumed_at
     FROM webauthn.challenge;
 -- kms_ref is present but granted for INSERT only: minting a key writes the
 -- reference, reading it back is a separate right served by signing_material.
-CREATE VIEW api.key AS
+CREATE VIEW api.key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, kms_ref, created_at,
          activated_at, signs_until, published_until, private_destroyed_at
     FROM akeys.key;
@@ -961,24 +985,36 @@ CREATE VIEW api.retention AS
 CREATE VIEW api.active_user AS
   SELECT id, created_at, deactivated_at
     FROM admin.active_user;
-CREATE VIEW api.live_session AS
+CREATE VIEW api.live_session
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, user_id, created_at, absolute_expires_at, ended_at, end_reason
     FROM admin.live_session;
-CREATE VIEW api.live_pair AS
+CREATE VIEW api.live_pair
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, session_id, jti_bearer, jti_refresh, issued_at, inactivity_expires_at,
          replaced_at
     FROM admin.live_pair;
-CREATE VIEW api.signing_key AS
+CREATE VIEW api.signing_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, session_id, state, public_jwk, created_at, activated_at,
          signs_until, published_until
     FROM akeys.signing_key;
-CREATE VIEW api.signing_material AS
+CREATE VIEW api.signing_material
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
     FROM akeys.signing_material;
-CREATE VIEW api.destroyable_key AS
+CREATE VIEW api.destroyable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, kms_ref, signs_until
     FROM akeys.destroyable_key;
-CREATE VIEW api.verifiable_key AS
+CREATE VIEW api.verifiable_key
+    WITH (security_invoker = TRUE)
+AS
   SELECT id, kid, user_id, public_jwk, signs_until, published_until
     FROM akeys.verifiable_key;
 
