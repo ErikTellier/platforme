@@ -18,6 +18,7 @@
     "verifier:paquets": "node packages/harnais/verifier-paquets.mjs",
     "test": "turbo run test",
     "test:db": "node packages/harnais/pgtap.mjs",
+    "mutation:sql": "node packages/harnais/mutation-sql.mjs",
     "mutation": "turbo run mutation",
     "dev": "turbo run dev",
     "format": "prettier --write .",

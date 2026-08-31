@@ -205,7 +205,37 @@ async function traiter(client, service, banc) {
   return anomaliesDuBanc;
 }
 
-const liste = services();
+// ═══ TROIS ARGUMENTS, ET SEUL LE PREMIER EST POUR UN HUMAIN ═══
+//
+//   pnpm test:db [service] [base] [banc]
+//
+// SERVICE  restreint a une base. Le mutant s'en sert : il joue la suite des
+//          centaines de fois, et n'a aucune raison de la jouer sur les autres.
+//
+// BASE     A QUELLE BASE SE CONNECTER, quand ce n'est pas celle du service.
+//          Le mutant travaille sur des CLONES — `admin_mutant_0`, `_1`… — pour
+//          deux raisons : plusieurs ouvriers a la fois, et surtout ne jamais
+//          amputer la base de developpement. Les bancs restent ceux du service ;
+//          seule la connexion change.
+//
+// BANC     un seul fichier, par son nom. Sert le cache de tueurs : quand on sait
+//          deja quel banc a tue une cible, on rejoue celui-la d'abord.
+//
+// Les deux derniers sont de la plomberie entre `mutation-sql.mjs` et ce
+// fichier. Un humain n'ecrit que le premier.
+const filtre = process.argv[2];
+const baseVisee = process.argv[3];
+const bancVise = process.argv[4];
+const liste =
+  filtre === undefined ? services() : services().filter((s) => s === filtre);
+
+if (filtre !== undefined && liste.length === 0) {
+  process.stderr.write(`
+Aucun service nomme "${filtre}" dans migrations/.
+
+`);
+  process.exit(1);
+}
 
 if (liste.length === 0) {
   process.stderr.write(
@@ -218,7 +248,10 @@ if (liste.length === 0) {
 const anomalies = [];
 
 for (const service of liste) {
-  const bancs = bancsDe(service);
+  const bancs =
+    bancVise === undefined || bancVise === ''
+      ? bancsDe(service)
+      : bancsDe(service).filter((b) => b.split(/[\\/]/).pop() === bancVise);
 
   if (bancs.length === 0) {
     process.stdout.write(`\n══ ${service} ══\n  aucun banc\n`);
@@ -230,7 +263,7 @@ for (const service of liste) {
     port: Number(process.env['POSTGRES_PORT'] ?? '5432'),
     user: requise('POSTGRES_USER'),
     password: requise('POSTGRES_PASSWORD'),
-    database: service,
+    database: baseVisee === undefined || baseVisee === '' ? service : baseVisee,
   });
 
   await client.connect();

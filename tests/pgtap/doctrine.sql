@@ -36,7 +36,7 @@
 
 SET search_path TO pgtap, public;
 
-SELECT plan(8);
+SELECT plan(9);
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- LA CLAUSE OUBLIÉE. Toute vue qui lit une table sous RLS s'exécute avec les
@@ -207,6 +207,39 @@ SELECT is(
              OR column_name IN ('status', 'active', 'expired', 'enabled', 'disabled'))),
     'aucune',
     'no column stores a state that a view could derive'
+);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- AUCUN INDEX INVALIDE. Un index `indisvalid = false` figure au catalogue et
+-- ne sert à rien : le planificateur l'ignore. Il ressemble à un index dans un
+-- `\d`, et la requête qu'il devait porter balaie la table.
+--
+-- DEUX FAÇONS D'EN ARRIVER LÀ, et aucune ne fait de bruit. Un
+-- `CREATE INDEX CONCURRENTLY` interrompu laisse un index mort-né. Et sur une
+-- table PARTITIONNÉE, un parent dont les partitions n'ont pas l'index attaché
+-- reste invalide.
+--
+-- CETTE ASSERTION EST NÉE D'UN INCIDENT, comme la première. Les quatre index
+-- d'`audit.event` — par acteur, par table, par client, par transaction — se
+-- sont retrouvés réduits à des parents sans enfants : `pg_get_indexdef` rend
+-- `CREATE INDEX ... ON ONLY ...` pour un index partitionné, et `mutation-sql`
+-- rejouait cette définition telle quelle. Quatorze partitions, zéro index,
+-- quatorze `Seq Scan` — et un journal d'audit muet le jour où l'on enquête.
+--
+-- Rien ne rougissait : le schéma se dégradait à chaque mesure. Le lanceur est
+-- corrigé ; ceci est ce qui le prouvera encore dans un an.
+--
+-- `indisready` complète : ni prêt ni valide, l'index est abandonné.
+SELECT is(
+    (SELECT coalesce(string_agg(n.nspname || '.' || c.relname, ', ' ORDER BY 1), 'aucun')
+       FROM pg_index x
+       JOIN pg_class c ON c.oid = x.indexrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname NOT LIKE 'pg\_%'
+        AND n.nspname NOT IN ('information_schema', 'public', 'pgtap')
+        AND (NOT x.indisvalid OR NOT x.indisready)),
+    'aucun',
+    'no index is invalid or half-built'
 );
 
 SELECT * FROM finish();

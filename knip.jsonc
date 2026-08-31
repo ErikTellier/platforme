@@ -17,9 +17,5 @@
     // de l'importer — il faut une variable d'environnement differente par
     // base, donc un processus par base. knip ne peut pas voir cet usage.
     "node-pg-migrate",
-
-    // Pair REQUIS de node-pg-migrate (">=4.3.0 <9.0.0"), jamais importe
-    // directement. Le retirer casserait la migration au premier lancement.
-    "pg",
   ],
 }
