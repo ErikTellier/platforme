@@ -82,7 +82,7 @@
 
 SET search_path TO pgtap, public;
 
-SELECT plan(30);
+SELECT plan(32);
 
 -- ─────────────────────────────────────────────────────────────────────────
 --  LE MONTAGE, EN SUPERUTILISATEUR
@@ -208,6 +208,30 @@ BEGIN
            (pg_temp.commande(w2, s_2, k_2, 'tenant.impersonate', '6b', 'TENANT', t2),
             w2, t2, gen_random_uuid(), 'INC-T2', 'reproduction',
             now() + interval '10 minutes');
+
+    -- ═══ UN LOT DE COMMANDES DE CHAQUE CÔTÉ ═══
+    --
+    -- `admin.command_batch` porte `target_tenant_id` et n'avait AUCUNE
+    -- politique jusqu'à `a_granted_view_must_open` : l'ouvrir au plan
+    -- applicatif sans la poser aurait rendu lisible à tout administrateur
+    -- l'empreinte du manifeste, le nombre de gestes et le signataire de
+    -- n'importe quel client. Un lot n'est qu'un regroupement de commandes
+    -- signées ; il se cache comme elles.
+    INSERT INTO webauthn.challenge
+        (id, user_id, session_id, challenge, action, expires_at, scope,
+         target_tenant_id, consumed_at)
+    VALUES ('77777777-7777-4777-8777-777777777771', c, sc, '\x70707070'::bytea,
+            'batch.sign', now() + interval '5 minutes', 'TENANT', t1, now()),
+           ('77777777-7777-4777-8777-777777777772', c, sc, '\x71717171'::bytea,
+            'batch.sign', now() + interval '5 minutes', 'TENANT', t2, now());
+
+    INSERT INTO admin.command_batch
+        (user_id, session_id, challenge_id, scope, target_tenant_id,
+         manifest_digest, declared_count)
+    VALUES (c, sc, '77777777-7777-4777-8777-777777777771', 'TENANT', t1,
+            decode(repeat('70', 32), 'hex'), 2),
+           (c, sc, '77777777-7777-4777-8777-777777777772', 'TENANT', t2,
+            decode(repeat('71', 32), 'hex'), 2);
 
     -- ═══ DE QUOI ÉPROUVER `own_or_platform` DES DEUX CÔTÉS ═══
     --
@@ -344,6 +368,22 @@ SELECT is(
       WHERE target_tenant_id = current_setting('essai.t2')::uuid),
     0,
     'and not that somebody opened one of the other tenant''s'
+);
+
+-- LE LOT SUIT SES COMMANDES. Le voir, c'est apprendre combien de gestes le
+-- voisin a préparés, sous quelle empreinte de manifeste, et par qui.
+SELECT is(
+    (SELECT count(*)::int FROM admin.command_batch
+      WHERE target_tenant_id = current_setting('essai.t1')::uuid),
+    1,
+    'they see the command batch prepared for their own tenant'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM admin.command_batch
+      WHERE target_tenant_id = current_setting('essai.t2')::uuid),
+    0,
+    'and not the one prepared for the other'
 );
 
 SELECT is(

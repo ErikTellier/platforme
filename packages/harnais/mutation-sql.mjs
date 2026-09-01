@@ -9,16 +9,37 @@
  *  le schema ENTIER — il retire chaque objet a son tour, relance la suite, et
  *  exige qu'elle rougisse.
  *
- *  Le resultat n'est pas un score, c'est une LISTE :
+ *  Le resultat n'est pas un score, c'est une LISTE — et elle est CLASSEE, parce
+ *  qu'une liste de deux cent trente lignes indifferenciees s'apprend a ne plus
+ *  lire, et qu'une liste qu'on ne lit plus ne mesure plus rien :
  *
  *    TUE       le retirer fait rougir la suite. L'objet porte quelque chose.
- *    SURVIT    il a disparu et tout passait encore. Soit l'invariant n'est
- *              teste par rien, soit l'objet est redondant. Les deux meritent
- *              une reponse, et aucun ne se voit autrement.
  *    IGNORE    d'autres objets en dependent : le retirer seul est impossible.
  *              On le signale, on ne force jamais un CASCADE — restaurer une
  *              cascade voudrait dire reconstruire les dependants, et un schema
  *              a moitie restaure empoisonne toutes les mutations suivantes.
+ *    MUET      un index NON UNIQUE. Il sert le planificateur et ne refuse rien :
+ *              aucune ecriture ne peut echouer a cause de lui, donc aucun banc
+ *              de comportement ne peut le tuer. Ce n'est pas un trou, c'est une
+ *              categorie que cet outil ne mesure pas.
+ *    ECARTE    declare inatteignable dans `tests/pgtap/inatteignables.json`,
+ *              AVEC SON MOTIF, affiche a chaque campagne. Le chemin qui le
+ *              ferait parler n'existe pas — une garde masquee par une autre qui
+ *              mord avant, une redondance deliberee, une course qu'un banc ne
+ *              sait pas fabriquer.
+ *    SURVIT    tout le reste, et c'est la LISTE DE TRAVAIL. Groupee par table,
+ *              parce que « quinze sur operator_residency » se lit et que quinze
+ *              lignes eparpillees dans deux cents ne se lisent pas.
+ *
+ *  ═══ CE QUI EMPECHE LES « ECARTES » DE POURRIR ═══
+ *
+ *  CHAQUE ENTREE EST FALSIFIABLE. Si un objet declare inatteignable se met a
+ *  MOURIR, la campagne REFUSE et demande de retirer l'entree : quelqu'un a
+ *  ecrit le banc qui l'atteint, le motif ne decrit plus rien, et le garder
+ *  ferait disparaitre de la liste un objet desormais couvert.
+ *
+ *  Une derogation qui ne peut pas devenir fausse en silence n'est plus une
+ *  derogation, c'est une explication verifiee a chaque passage.
  *
  *  ═══ CE QU'IL FAUT SAVOIR AVANT DE LIRE SON VERDICT ═══
  *
@@ -30,17 +51,25 @@
  *  assertions de `doctrine.sql` n'en tuent aucune. Seuls les bancs qui ecrivent
  *  une ligne interdite et exigent un code d'erreur tuent quelque chose.
  *
- *  ═══ OU EN EST LA SUITE, MESURE LE 31 AOUT 2026 ═══
+ *  ═══ OU EN EST LA SUITE, MESURE LE 1er SEPTEMBRE 2026 ═══
  *
- *    admin    60 tues / 341 jouees / 153 ignores
+ *    admin   113 tues / 343 jouees / 153 ignores
+ *            27 muets, 9 ecartes, 194 a ecrire
  *
- *      contrainte     7 / 130        declencheur   24 / 115
- *      index          5 /  47        politique     20 /  24
- *      fonction       4 /  25
+ *      contrainte    28 / 130        declencheur   41 / 115
+ *      index         11 /  47        politique     22 /  26
+ *      fonction      11 /  25
  *
  *  Ce que chaque banc tue, et ce qu'il couvre :
  *
- *    cloisonnement.sql           15   les 12 politiques de securite de ligne
+ *    cloisonnement.sql           16   les 13 politiques de securite de ligne
+ *    session-et-cles.sql         16   admin.session, akeys.key
+ *    rotation-des-jetons.sql      9   admin.token_pair, rotate_pair,
+ *                                      validate_bearer
+ *    journal.sql                  7   audit.event, et les premiers zz_audit
+ *    flux-de-connexion.sql       10   admin.login_flow, open_ et consume_
+ *    ticket-d-enrolement.sql     10   admin.enrollment_ticket et ses trois
+ *                                      fonctions
  *    octroi-autorite.sql         11   admin.platform_admin, admin.admin_tenant
  *    commande-signee.sql          7   admin.signed_command
  *    demande-autorite.sql         7   admin.authority_request
@@ -49,11 +78,16 @@
  *
  *  Plus `may_operate` et `signs_here`, que les bancs d'autorite tuent ensemble.
  *
- *  LES 281 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
+ *  LES 194 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
  *  mesure ce qui reste a ecrire, et c'est a cela qu'il sert. En tete de ce qui
- *  manque : `admin.session` et `akeys.key` (le cycle de vie des cles),
- *  `admin.token_pair` (le rejeu de rafraichissement), `audit.event`
- *  (l'immuabilite du journal), `admin.login_flow`, `admin.enrollment_ticket`.
+ *  manque : `admin.identity` (la federation), les deux tables de residence,
+ *  `admin.spent_proof`, `admin.command_batch` au-dela de sa politique, et
+ *  l'anneau de retention d'`audit`.
+ *
+ *  VINGT DES VINGT-TROIS `zz_audit` SURVIVENT ENCORE. `journal.sql` en tue
+ *  trois — ceux des tables dont il relit la trace. Les autres tomberaient au
+ *  fur et a mesure que chaque table gagne son banc ; ce n'est pas un trou a
+ *  part, c'est le meme.
  *
  *  ═══ DEUX SORTES DE TUES, ET IL FAUT LES DISTINGUER ═══
  *
@@ -114,7 +148,7 @@
  *  risque plus rien — le travail se fait sur des clones jetables.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -223,7 +257,13 @@ const FAMILLES = {
     lister: `
       SELECT c.relname AS nom,
              n.nspname || '.' || quote_ident(c.relname) AS porteur,
-             replace(pg_get_indexdef(i.indexrelid), ' ON ONLY ', ' ON ') AS definition
+             replace(pg_get_indexdef(i.indexrelid), ' ON ONLY ', ' ON ') AS definition,
+             -- UN INDEX NON UNIQUE NE REFUSE RIEN : il sert le planificateur.
+             -- Aucune ecriture ne peut echouer a cause de lui, donc aucun banc
+             -- de COMPORTEMENT ne peut le tuer. Ce n'est pas un trou de
+             -- couverture, c'est une categorie d'objet que cet outil ne mesure
+             -- pas — et le rapport le dit au lieu de le noyer.
+             i.indisunique AS refuse
         FROM pg_index i
         JOIN pg_class c ON c.oid = i.indexrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -336,7 +376,8 @@ const FAMILLES = {
 };
 
 /**
- * @typedef {{ nom: string; porteur: string; definition: string }} Objet
+ * @typedef {{ nom: string; porteur: string; definition: string;
+ *             refuse?: boolean }} Objet
  */
 
 /**
@@ -585,7 +626,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 
 /**
  * @typedef {{ base: string; client: import('pg').Client }} Atelier
- * @typedef {{ retrait: string; retour: string; libelle: string }} Cible
+ * @typedef {{ retrait: string; retour: string; libelle: string; cle: string;
+ *             refuse: boolean }} Cible
  * @typedef {'tue' | 'survit' | 'ignore'} Verdict
  */
 
@@ -679,11 +721,65 @@ const OUVRIERS = Math.max(
   ),
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  LES OBJETS QU'AUCUN BANC NE PEUT ATTEINDRE
+//
+//  Un survivant est une QUESTION. Certains n'ont pourtant aucune reponse a
+//  attendre : le chemin qui les ferait parler n'existe pas. Les laisser dans la
+//  meme liste apprend a detourner le regard d'une liste — et une liste qu'on ne
+//  lit plus ne mesure plus rien.
+//
+//  ON NE LES CACHE PAS, ON LES CLASSE, et le rapport dit combien.
+//
+//  CHAQUE ENTREE EST FALSIFIABLE. Si un objet declare inatteignable se met a
+//  MOURIR, le lanceur refuse et demande de retirer l'entree. Une exception
+//  devenue fausse ne peut donc pas survivre en silence a la campagne suivante —
+//  c'est ce qui distingue ce fichier d'une liste de derogations.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CHEMIN_INATTEIGNABLES = join(
+  RACINE,
+  'tests',
+  'pgtap',
+  'inatteignables.json',
+);
+
+/** @returns {Map<string, string>} */
+function lireInatteignables() {
+  /** @type {Map<string, string>} */
+  const declares = new Map();
+
+  if (!existsSync(CHEMIN_INATTEIGNABLES)) return declares;
+
+  const brut = /** @type {unknown} */ (
+    JSON.parse(readFileSync(CHEMIN_INATTEIGNABLES, 'utf8'))
+  );
+
+  if (typeof brut !== 'object' || brut === null) return declares;
+
+  for (const [cle, motif] of Object.entries(brut)) {
+    // Les clefs qui commencent par `_` portent la prose du fichier.
+    if (!cle.startsWith('_') && typeof motif === 'string') {
+      declares.set(cle, motif);
+    }
+  }
+
+  return declares;
+}
+
+const INATTEIGNABLES = lireInatteignables();
+
 let tuesTotal = 0;
 /** @type {string[]} */
 const survivantsTotal = [];
 /** @type {string[]} */
 const ignoresTotal = [];
+/** @type {string[]} */
+const muetsTotal = [];
+/** @type {string[]} */
+const ecartesTotal = [];
+/** @type {string[]} */
+const perimeesTotal = [];
 
 /**
  * Toutes les cibles des familles demandees, lues sur UN clone.
@@ -708,6 +804,12 @@ async function listerCibles(client) {
         retrait: recette.retirer(objet),
         retour: recette.remettre(objet),
         libelle: `${famille} ${objet.nom} sur ${objet.porteur}`,
+        // La clef du fichier des inatteignables, et le porteur en fait partie :
+        // deux schemas peuvent nommer leur contrainte pareil.
+        cle: `${famille}|${objet.nom}|${objet.porteur}`,
+        // `undefined` pour les familles qui ne se posent pas la question — un
+        // declencheur refuse toujours quelque chose, par construction.
+        refuse: objet.refuse ?? true,
       })),
     );
   }
@@ -738,6 +840,8 @@ async function fermerAteliers(ateliers) {
  * @returns {void}
  */
 function enregistrer(resultat, cible) {
+  const motif = INATTEIGNABLES.get(cible.cle);
+
   if (resultat === 'ignore') {
     ignoresTotal.push(cible.libelle);
     process.stdout.write(`  ignore  ${cible.libelle}\n`);
@@ -745,10 +849,27 @@ function enregistrer(resultat, cible) {
   }
 
   if (resultat === 'survit') {
-    survivantsTotal.push(cible.libelle);
-    process.stdout.write(`  SURVIT  ${cible.libelle}\n`);
+    // TROIS SORTES DE SURVIVANTS, et les confondre est ce qui rend un rapport
+    // illisible. Seule la troisieme est du travail a faire.
+    if (motif !== undefined) {
+      ecartesTotal.push(`${cible.libelle}\n            ${motif}`);
+      process.stdout.write(`  ecarte  ${cible.libelle}\n`);
+    } else if (!cible.refuse) {
+      muetsTotal.push(cible.libelle);
+      process.stdout.write(`  muet    ${cible.libelle}\n`);
+    } else {
+      survivantsTotal.push(cible.libelle);
+      process.stdout.write(`  SURVIT  ${cible.libelle}\n`);
+    }
+
     return;
   }
+
+  // UNE EXCEPTION DEVENUE FAUSSE. L'objet est declare inatteignable et il vient
+  // de MOURIR : quelqu'un a ecrit le banc qui l'atteint. Le motif ne decrit plus
+  // rien, et le garder ferait disparaitre de la liste un objet desormais
+  // couvert — donc mentir dans l'autre sens.
+  if (motif !== undefined) perimeesTotal.push(cible.libelle);
 
   tuesTotal += 1;
   process.stdout.write(`  tue     ${cible.libelle}\n`);
@@ -828,14 +949,96 @@ for (const service of bases) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  LE RAPPORT
+//
+//  IL SE LIT DE HAUT EN BAS, et la DERNIERE liste est la seule qui demande du
+//  travail. Tout melanger donnait deux cent trente lignes dont on apprenait a
+//  detourner le regard — et une liste qu'on ne lit plus ne mesure plus rien.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// UNE EXCEPTION PERIMEE ARRETE TOUT, avant meme le rapport : le fichier des
+// inatteignables decrirait alors un schema qui n'est plus celui-la.
+if (perimeesTotal.length > 0) {
+  process.stderr.write(
+    [
+      '',
+      'REFUS : des objets declares inatteignables viennent d etre TUES.',
+      '',
+      '  Quelqu un a ecrit le banc qui les atteint — bonne nouvelle, et leur',
+      '  entree ne decrit plus rien. La garder les retirerait d une liste ou',
+      '  ils ont desormais leur place.',
+      '',
+      ...perimeesTotal.map((t) => `    ${t}`),
+      '',
+      `  A retirer de :  ${CHEMIN_INATTEIGNABLES}`,
+      '',
+      '',
+    ].join('\n'),
+  );
+  process.exit(1);
+}
+
 process.stdout.write(
   `\n${String(tuesTotal)} tue(s) — les retirer fait rougir la suite\n` +
-    `${String(ignoresTotal.length)} ignore(s) — d'autres objets en dependent\n` +
-    `${String(survivantsTotal.length)} SURVIVANT(S)\n\n`,
+    `${String(ignoresTotal.length)} ignore(s) — d autres objets en dependent\n` +
+    `${String(muetsTotal.length)} muet(s) — n opposent aucun refus, rien a tuer\n` +
+    `${String(ecartesTotal.length)} ecarte(s) — inatteignables, motif ci-dessous\n` +
+    `${String(survivantsTotal.length)} SURVIVANT(S) — la liste de travail\n`,
 );
 
-for (const s of survivantsTotal.toSorted((a, b) => a.localeCompare(b))) {
-  process.stdout.write(`  ${s}\n`);
+if (ecartesTotal.length > 0) {
+  process.stdout.write('\n─── ecartes, et pourquoi ───\n\n');
+
+  for (const e of ecartesTotal.toSorted((a, b) => a.localeCompare(b))) {
+    process.stdout.write(`  ${e}\n\n`);
+  }
+}
+
+if (muetsTotal.length > 0) {
+  process.stdout.write(
+    '\n─── muets : index non uniques, qui servent le planificateur ───\n\n',
+  );
+
+  for (const m of muetsTotal.toSorted((a, b) => a.localeCompare(b))) {
+    process.stdout.write(`  ${m}\n`);
+  }
+}
+
+// LES SURVIVANTS, GROUPES PAR TABLE. C'est la forme qui dit ou aller : « quinze
+// sur operator_residency » se lit, quinze lignes eparpillees dans deux cents ne
+// se lisent pas.
+if (survivantsTotal.length > 0) {
+  /** @type {Map<string, string[]>} */
+  const parPorteur = new Map();
+
+  for (const s of survivantsTotal) {
+    const porteur = /sur (\S+)/.exec(s)?.[1] ?? '?';
+    const deja = parPorteur.get(porteur);
+
+    if (deja === undefined) parPorteur.set(porteur, [s]);
+    else deja.push(s);
+  }
+
+  process.stdout.write('\n─── a ecrire, par table ───\n');
+
+  const groupes = [...parPorteur.entries()].toSorted(
+    (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+  );
+
+  for (const [porteur, objets] of groupes) {
+    // Le porteur est deja le titre du groupe : le repeter sur chaque ligne
+    // rendrait la colonne illisible.
+    const suffixe = ` sur ${porteur}`;
+
+    process.stdout.write(`\n  ${porteur} (${String(objets.length)})\n`);
+
+    for (const o of objets.toSorted((a, b) => a.localeCompare(b))) {
+      process.stdout.write(`    ${o.replace(suffixe, '')}\n`);
+    }
+  }
+
+  process.stdout.write('\n');
 }
 
 // LE CODE DE SORTIE RESTE 0. Un survivant est une QUESTION, pas un echec : il

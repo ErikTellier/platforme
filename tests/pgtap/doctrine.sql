@@ -36,7 +36,7 @@
 
 SET search_path TO pgtap, public;
 
-SELECT plan(9);
+SELECT plan(10);
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- LA CLAUSE OUBLIÉE. Toute vue qui lit une table sous RLS s'exécute avec les
@@ -240,6 +240,62 @@ SELECT is(
         AND (NOT x.indisvalid OR NOT x.indisready)),
     'aucun',
     'no index is invalid or half-built'
+);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- UNE VUE ACCORDÉE S'OUVRE. Sinon l'octroi est un mensonge : la vue figure
+-- dans un `\dv`, elle a son `GRANT`, et chaque appel rend `42501`.
+--
+-- LES VUES D'`api` PORTENT `security_invoker`, donc elles s'exécutent avec les
+-- droits de L'APPELANT — qui doit pouvoir lire toute la chaîne en dessous, pas
+-- seulement la vue du dessus. Une seule relation fermée en chemin suffit.
+--
+-- CETTE ASSERTION EST NÉE D'UN CONSTAT, comme les deux autres de ce fichier :
+-- dix-huit vues sur trente-quatre étaient dans ce cas. Un tiers de la surface
+-- de lecture, jamais remarqué parce que personne ne s'était jamais connecté
+-- comme le rôle applicatif — les bancs tournaient en superutilisateur, qui
+-- contourne le RLS et possède tout.
+--
+-- ELLE NE NOMME AUCUN RÔLE : elle prend ceux qui ont l'octroi, quels qu'ils
+-- soient. Un service qui déclarerait demain un second plan de lecture serait
+-- couvert sans qu'on y pense — et c'est ce qu'on veut d'une doctrine.
+--
+-- La récursion compte, ici comme pour `security_invoker` : `api.signing_key`
+-- lit `akeys.signing_key` qui lit `akeys.key`. Un seul saut n'aurait vu que le
+-- maillon du milieu.
+SELECT is(
+    (WITH RECURSIVE lit AS (
+        SELECT v.oid AS vue, s.oid AS source
+          FROM pg_depend d
+          JOIN pg_rewrite r ON r.oid = d.objid
+          JOIN pg_class v ON v.oid = r.ev_class
+          JOIN pg_class s ON s.oid = d.refobjid
+         WHERE v.relkind = 'v' AND s.relkind IN ('r', 'p', 'v') AND s.oid <> v.oid
+        UNION
+        SELECT l.vue, d.refobjid
+          FROM lit l
+          JOIN pg_rewrite r ON r.ev_class = l.source
+          JOIN pg_depend d ON d.objid = r.oid
+          JOIN pg_class s ON s.oid = d.refobjid
+         WHERE s.relkind IN ('r', 'p', 'v') AND s.oid <> l.source
+      )
+      SELECT coalesce(string_agg(DISTINCT beneficiaire || ' : api.' || vue, ', '), 'aucune')
+        FROM (
+          SELECT g.rolname AS beneficiaire, v.relname AS vue
+            FROM lit l
+            JOIN pg_class v ON v.oid = l.vue
+            JOIN pg_namespace vn ON vn.oid = v.relnamespace
+            JOIN pg_class s ON s.oid = l.source
+            JOIN pg_namespace sn ON sn.oid = s.relnamespace
+            CROSS JOIN LATERAL aclexplode(v.relacl) a
+            JOIN pg_roles g ON g.oid = a.grantee
+           WHERE vn.nspname = 'api'
+             AND a.privilege_type = 'SELECT'
+             AND NOT (has_schema_privilege(g.oid, sn.oid, 'USAGE')
+                      AND has_table_privilege(g.oid, s.oid, 'SELECT'))
+        ) manquantes),
+    'aucune',
+    'every granted api view can actually be read by whoever it was granted to'
 );
 
 SELECT * FROM finish();
