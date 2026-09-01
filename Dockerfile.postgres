@@ -1,0 +1,100 @@
+# POSTGRES, PLUS pgTAP.
+#
+# ═══ POURQUOI UNE IMAGE À NOUS ═══
+#
+# pgTAP est une EXTENSION : ses fichiers doivent être dans le SERVEUR, pas dans
+# le client. Aucune image officielle ne la porte, et l'installer à chaud se
+# perdrait au premier `docker compose up` sur une image neuve.
+#
+# ═══ POURQUOI ON RESTE SUR alpine, ET CE N'EST PAS UNE QUESTION DE TAILLE ═══
+#
+# La voie courte serait `postgres:17` (Debian), où `postgresql-17-pgtap` est un
+# paquet. Elle ferait passer le serveur de musl à la glibc — donc changer de
+# bibliothèque de COLLATION sous un `pgdata` déjà écrit.
+#
+# Un index sur du texte est trié selon la collation qui existait à sa création.
+# En changer sans réindexer laisse des index dont l'ordre ne correspond plus à
+# celui du serveur : les recherches par intervalle rendent des résultats
+# INCOMPLETS, sans erreur et sans avertissement. Postgres signale la divergence
+# de version au mieux ; il ne la corrige pas.
+#
+# Le compose partait déjà de `postgres:17-alpine` en prévision de ce jour :
+# passer à cette image-ci ne change donc pas de collation, et les volumes déjà
+# écrits restent lisibles.
+#
+# Compiler l'extension coûte trente secondes, une fois. Ça vaut mieux que de
+# devoir se souvenir d'un `REINDEX DATABASE`.
+FROM postgres:17-alpine
+
+# LA VERSION EST ÉPINGLÉE ET SA SOMME VÉRIFIÉE. Ce qu'on installe ici tourne
+# DANS le serveur, avec ses droits.
+ARG PGTAP_VERSION=1.3.4
+ARG PGTAP_SHA256=d2c951afb296a001d21785611a8e966e3f8fa3f5bfbd929396a5130c0152f314
+
+# ═══ LES AUTORITÉS LOCALES, AVANT TOUT TÉLÉCHARGEMENT ═══
+#
+# Derrière un pare-feu qui inspecte le TLS, le conteneur ne voit pas le vrai
+# certificat du serveur mais celui que l'appareil réémet — et `apk` refuse :
+# « TLS: server certificate not trusted ». Le poste, lui, fonctionne, parce que
+# l'autorité de l'appareil est dans son magasin Windows.
+#
+# Constaté ici : un Fortinet réémet pour `dl-cdn.alpinelinux.org`, pas pour
+# `github.com`. L'interception est sélective, donc le symptôme aussi — d'où le
+# temps qu'il faut pour comprendre que le Dockerfile n'y est pour rien.
+#
+# On ajoute au faisceau plutôt que d'installer `ca-certificates` : ce paquet
+# viendrait d'`apk`, qui est précisément ce qui ne marche pas encore.
+#
+# ═══ POURQUOI `.dockerignore` FIGURE DANS CE `COPY` ═══
+#
+# `certs/` N'EST PAS VERSIONNÉ, délibérément : une autorité d'interception
+# permet à qui la détient de se faire passer pour n'importe quel serveur, et la
+# committer demanderait à tous ceux qui clonent de faire confiance au pare-feu
+# d'une seule entreprise. Chacun pose la sienne, ou aucune.
+#
+# Conséquence : sur un poste qui n'en a pas, le dossier n'existe pas — et un
+# `COPY certs/` échoue alors, sans appel :
+#
+#   ERROR: failed to compute cache key: "/certs": not found
+#
+# Le dépôt fraîchement cloné ne construisait donc pas. Vérifié, pas supposé.
+#
+# UN GLOB NE SUFFIT PAS : `COPY certs*` qui ne correspond à rien échoue tout
+# autant. Il faut qu'au moins UNE source existe toujours, et `.dockerignore` est
+# le seul fichier dont ce contexte garantit la présence — il le définit.
+#
+# Il atterrit donc dans `/tmp/certs/` avec les `.crt`, où il ne gêne personne :
+# le `cat` ne lit que `*.crt`, et le dossier part à la ligne suivante. Sans
+# interception, l'étape est un no-op complet.
+COPY .dockerignore certs* /tmp/certs/
+RUN cat /tmp/certs/*.crt >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true \
+ && rm -rf /tmp/certs
+
+# Les outils de construction partent avec `apk del` : ils n'ont rien à faire
+# dans une image qui tourne, et un compilateur présent est un compilateur
+# utilisable.
+# LES VERSIONS SONT EPINGLEES, comme celle de pgTAP juste au-dessus. Cette
+# chaine part avec `apk del` et n'embarque rien — mais elle COMPILE l'extension
+# qui, elle, reste : un compilateur qui change produit un binaire different, et
+# le SHA256 du dessus ne dit rien de ce qui sort du compilateur.
+#
+# `=~` ET NON `=` : `curl=~8.20` accepte 8.20.x-rN. Alpine fait tourner ses
+# revisions — un epinglage exact casserait la construction dans quelques
+# semaines sur un « unable to select packages » que personne ne saurait lire.
+# On fige la version mineure, pas le numero de revision.
+RUN apk add --no-cache --virtual .construction \
+        curl=~8.20 \
+        make=~4.4 \
+        gcc=~15.2 \
+        musl-dev=~1.2 \
+        perl=~5.42 \
+        patch=~2.8 \
+        postgresql17-dev=~17.11 \
+ && curl -fsSL -o /tmp/pgtap.tar.gz \
+      "https://github.com/theory/pgtap/archive/refs/tags/v${PGTAP_VERSION}.tar.gz" \
+ && echo "${PGTAP_SHA256}  /tmp/pgtap.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/pgtap.tar.gz -C /tmp \
+ && make -C "/tmp/pgtap-${PGTAP_VERSION}" \
+ && make -C "/tmp/pgtap-${PGTAP_VERSION}" install \
+ && rm -rf /tmp/pgtap.tar.gz "/tmp/pgtap-${PGTAP_VERSION}" \
+ && apk del .construction

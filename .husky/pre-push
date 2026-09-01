@@ -97,7 +97,45 @@ fi
 # pendant qu'on travaille. Le laisser derriere soi ne l'est plus.
 pnpm knip
 
-# ─── 6. Lint, types, tests, mutation, construction ───────────────────────────
+# ─── 6. Le shell du harnais, relu ────────────────────────────────────────────
+#
+# CE FICHIER EN FAIT PARTIE. Treize scripts, cinq cents lignes : les crochets et
+# les gardes qu'ils appellent. Une faute ici ne casse pas une construction, elle
+# DESARME une verification — le crochet passe au vert sans avoir rien verifie.
+#
+# Le seul endroit du depot ou l'erreur se traduit par un garde silencieux, et le
+# seul qui n'etait relu par rien. Docker absent : on saute, comme le banc plus
+# bas.
+pnpm lint:shell
+
+# ─── 7. Les dollars des bancs SQL ────────────────────────────────────────────
+#
+# Dans une chaine de remplacement JavaScript, `$$` veut dire « un $ litteral ».
+# Un remplacement programmatique sur un banc pgTAP transforme donc `DO $$ BEGIN`
+# en `DO $ BEGIN` — silencieusement, et le defaut remonte plus loin sous forme
+# d'erreur de syntaxe a un endroit sans rapport.
+#
+# Cinq fois dans une seule session, dont une qui a gache une campagne complete.
+# Compter les `$$` ne suffit pas : deux paires cassees symetriquement laissent le
+# compte pair. Le garde reconnait donc les usages legitimes du dollar — litteral,
+# commentaire, delimiteur, parametre positionnel — et signale tout le reste.
+pnpm lint:sql
+
+# ─── 8. La doctrine, verifiee sur la base vivante ────────────────────────────
+#
+# Une migration decrit ce qu'elle POSE ; elle ne dit rien de ce qu'une suivante
+# a defait sans le vouloir. Vingt-six vues avaient perdu `security_invoker`
+# ainsi — chacune correcte isolement, l'ensemble faux.
+#
+# Exige une base migree. Elle n'est pas toujours la : le banc SAUTE plutot que
+# de rougir, sinon on pousserait sans lui par lassitude.
+if pnpm exec node -e "process.exit(0)" >/dev/null 2>&1 && pnpm migrate:status >/dev/null 2>&1; then
+  pnpm test:db
+else
+  echo "  doctrine : base injoignable, banc saute" >&2
+fi
+
+# ─── 9. Lint, types, tests, mutation, construction ───────────────────────────
 #
 # `mutation` ferme la derniere porte : la couverture prouve qu une ligne a ete
 # EXECUTEE, jamais qu un test l AFFIRME. Stryker casse le code et verifie qu un

@@ -57,6 +57,20 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Autorites de certification locales — voir certs/LISEZMOI.md.
+# Une autorite d'interception ne se partage pas : chacun pose la sienne.
+#
+# LE CONTENU EST IGNORE, PAS LE DOSSIER, et la nuance n'est pas cosmetique :
+# `Dockerfile.postgres` fait `COPY certs/ /tmp/certs/`. Un `certs/` nu ignorait
+# aussi le LISEZMOI, donc git ne suivait RIEN, donc un depot fraichement clone
+# n'avait pas le dossier — et la construction echouait sur :
+#
+#   failed to compute cache key: "/certs": not found
+#
+# Le LISEZMOI reste suivi : il explique comment peupler le dossier, et sa seule
+# presence suffit a le faire exister apres un clone.
+certs/*
+
 # Misc
 .DS_Store
 *.pem
