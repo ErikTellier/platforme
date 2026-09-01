@@ -108,7 +108,20 @@ pnpm knip
 # bas.
 pnpm lint:shell
 
-# ─── 7. La doctrine, verifiee sur la base vivante ────────────────────────────
+# ─── 7. Les dollars des bancs SQL ────────────────────────────────────────────
+#
+# Dans une chaine de remplacement JavaScript, `$$` veut dire « un $ litteral ».
+# Un remplacement programmatique sur un banc pgTAP transforme donc `DO $$ BEGIN`
+# en `DO $ BEGIN` — silencieusement, et le defaut remonte plus loin sous forme
+# d'erreur de syntaxe a un endroit sans rapport.
+#
+# Cinq fois dans une seule session, dont une qui a gache une campagne complete.
+# Compter les `$$` ne suffit pas : deux paires cassees symetriquement laissent le
+# compte pair. Le garde reconnait donc les usages legitimes du dollar — litteral,
+# commentaire, delimiteur, parametre positionnel — et signale tout le reste.
+pnpm lint:sql
+
+# ─── 8. La doctrine, verifiee sur la base vivante ────────────────────────────
 #
 # Une migration decrit ce qu'elle POSE ; elle ne dit rien de ce qu'une suivante
 # a defait sans le vouloir. Vingt-six vues avaient perdu `security_invoker`
@@ -122,7 +135,7 @@ else
   echo "  doctrine : base injoignable, banc saute" >&2
 fi
 
-# ─── 8. Lint, types, tests, mutation, construction ───────────────────────────
+# ─── 9. Lint, types, tests, mutation, construction ───────────────────────────
 #
 # `mutation` ferme la derniere porte : la couverture prouve qu une ligne a ete
 # EXECUTEE, jamais qu un test l AFFIRME. Stryker casse le code et verifie qu un
