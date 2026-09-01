@@ -53,12 +53,12 @@
  *
  *  ═══ OU EN EST LA SUITE, MESURE LE 1er SEPTEMBRE 2026 ═══
  *
- *    admin   113 tues / 343 jouees / 153 ignores
- *            27 muets, 9 ecartes, 194 a ecrire
+ *    admin   199 tues / 343 jouees / 153 ignores
+ *            27 muets, 18 ecartes, 99 a ecrire
  *
- *      contrainte    28 / 130        declencheur   41 / 115
- *      index         11 /  47        politique     22 /  26
- *      fonction      11 /  25
+ *      contrainte    67 / 130        declencheur   71 / 115
+ *      index         15 /  47        politique     24 /  26
+ *      fonction      22 /  25
  *
  *  Ce que chaque banc tue, et ce qu'il couvre :
  *
@@ -70,6 +70,14 @@
  *    flux-de-connexion.sql       10   admin.login_flow, open_ et consume_
  *    ticket-d-enrolement.sql     10   admin.enrollment_ticket et ses trois
  *                                      fonctions
+ *    revocation-autorite.sql     18   couper un acces, sur les deux portees
+ *    residence.sql               13   la juridiction : les deux tables
+ *    lot-de-commandes.sql         9   admin.command_batch, une touche pour N
+ *    defi-et-identite.sql        15   challenge, identity, user
+ *    vocabulaires.sql            16   les tables de reference, la deprecation
+ *    retrait-de-demande.sql       2   la troisieme issue d une demande
+ *    purge-et-retention.sql       8   spent_proof, les purges, l anneau
+ *    operations.sql               7   les fonctions d exploitation
  *    octroi-autorite.sql         11   admin.platform_admin, admin.admin_tenant
  *    commande-signee.sql          7   admin.signed_command
  *    demande-autorite.sql         7   admin.authority_request
@@ -78,16 +86,21 @@
  *
  *  Plus `may_operate` et `signs_here`, que les bancs d'autorite tuent ensemble.
  *
- *  LES 194 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
+ *  LES 99 SURVIVANTS NE SONT PAS FAIBLES — rien ne les eprouve. Le chiffre
  *  mesure ce qui reste a ecrire, et c'est a cela qu'il sert. En tete de ce qui
- *  manque : `admin.identity` (la federation), les deux tables de residence,
- *  `admin.spent_proof`, `admin.command_batch` au-dela de sa politique, et
- *  l'anneau de retention d'`audit`.
+ *  manque, et la composition a change : 31 CLES ETRANGERES et 39 `zz_audit` /
+ *  `zz_audit_truncate`, soit plus des deux tiers. Les 29 autres sont pour
+ *  l'essentiel des `CHECK` de forme ombrages par un declencheur qui mord avant.
  *
- *  VINGT DES VINGT-TROIS `zz_audit` SURVIVENT ENCORE. `journal.sql` en tue
- *  trois — ceux des tables dont il relit la trace. Les autres tomberaient au
- *  fur et a mesure que chaque table gagne son banc ; ce n'est pas un trou a
- *  part, c'est le meme.
+ *  CHACUN DEMANDE D'ETRE SONDE avant d'etre declare inatteignable : le
+ *  raisonnement s'est trompe CINQ FOIS sur cette seule question, et cinq motifs
+ *  faux seraient entres dans `inatteignables.json` — ou ils auraient ete
+ *  reverifies a chaque campagne sans jamais rougir.
+ *
+ *  SEIZE DES VINGT-TROIS `zz_audit` SURVIVENT ENCORE, et les vingt-trois
+ *  `zz_audit_truncate` avec. Les premiers tombent quand un banc RELIT ce qu'ils
+ *  ecrivent — sept l'ont fait. Les seconds demandent un `TRUNCATE`, que rien
+ *  ne garde aujourd'hui : voir la note en fin de session.
  *
  *  ═══ DEUX SORTES DE TUES, ET IL FAUT LES DISTINGUER ═══
  *

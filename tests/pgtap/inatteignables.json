@@ -19,22 +19,22 @@
     "Le motif est obligatoire, et doit dire pourquoi le chemin n'existe pas —",
     "jamais « pas encore teste », qui est la definition d'un survivant."
   ],
-
   "contrainte|signed_command_scope|admin.signed_command": "Une commande doit correspondre a son defi (AD080), et `webauthn.challenge` porte deja `challenge_scope`. Fabriquer une commande hors vocabulaire suppose un defi hors vocabulaire, que la table des defis refuse la premiere. Filet pour l'ecriture directe.",
-
   "contrainte|signed_command_target_matches_scope|admin.signed_command": "Meme raison : `challenge_target_matches_scope` mord avant, puisque la commande doit concorder avec son defi.",
-
   "contrainte|signed_command_action_fk|admin.signed_command": "Meme raison : `challenge_action_fk` refuse deja le verbe hors vocabulaire sur le defi.",
-
   "contrainte|signed_command_session_fk|admin.signed_command": "Trois cles etrangeres composites portent `session_id` — celle de la session, celle du defi, celle de la cle. Une session inventee les viole toutes les trois : en retirer une laisse les deux autres. Redondance deliberee, pas trou de couverture.",
-
   "contrainte|signed_command_challenge_fk|admin.signed_command": "Redondante avec les deux autres cles composites portant `session_id`. Voir `signed_command_session_fk`.",
-
   "contrainte|signed_command_key_fk|admin.signed_command": "Le declencheur `command_matches_presence` repond AD082 avant que cette cle composite n'ait la parole.",
-
   "index|uq_session_mono|admin.uq_session_mono": "`session_supersede` ferme la session precedente AVANT l'insertion : l'index n'a jamais rien a refuser en sequentiel. Il ne parle que sur une COURSE — deux connexions simultanees passent toutes deux le declencheur, qui ne voit que les lignes validees. Un banc ne sait pas fabriquer cette course.",
-
   "index|uq_ticket_live_per_user|admin.uq_ticket_live_per_user": "Meme construction que `uq_session_mono` : `ticket_supersede` revoque le precedent avant l'insertion.",
-
-  "politique|own_or_platform|akeys.key": "Le role applicatif n'a aucun droit sur le schema `akeys` — pas meme USAGE — et les quatre vues qui l'exposent sont en `security_invoker`. Aucun chemin ne mene a cette politique depuis le plan applicatif."
+  "politique|own_or_platform|akeys.key": "Le role applicatif n'a aucun droit sur le schema `akeys` — pas meme USAGE — et les quatre vues qui l'exposent sont en `security_invoker`. Aucun chemin ne mene a cette politique depuis le plan applicatif.",
+  "contrainte|platform_admin_granted_by_fk|admin.platform_admin": "Le declencheur `platform_admin_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|platform_admin_command_id_fkey|admin.platform_admin": "Le declencheur `platform_admin_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|platform_admin_revoked_by_fk|admin.platform_admin": "Le declencheur `platform_admin_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|platform_admin_revoked_command_id_fkey|admin.platform_admin": "Le declencheur `platform_admin_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|admin_tenant_granted_by_fk|admin.admin_tenant": "Le declencheur `admin_tenant_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|admin_tenant_command_id_fkey|admin.admin_tenant": "Le declencheur `admin_tenant_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|admin_tenant_revoked_by_fk|admin.admin_tenant": "Le declencheur `admin_tenant_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|admin_tenant_revoked_command_id_fkey|admin.admin_tenant": "Le declencheur `admin_tenant_is_signed` cherche une commande `authority.grant`/`authority.revoke` par ce meme identifiant : introuvable, il repond AD085 avant que la cle etrangere n'ait la parole. MESURE, pas suppose.",
+  "contrainte|platform_admin_expires_after_granted|admin.platform_admin": "Un octroi de plateforme doit porter LE MEME terme que la demande approuvee (AD087), et une demande dont l'echeance est passee ne peut plus etre approuvee (AD094, affirme par demande-autorite.sql). Un octroi au terme anterieur ne peut donc jamais avoir de demande approuvee correspondante. La contrainte jumelle sur `admin_tenant` est ATTEIGNABLE — la portee client n'exige pas de demande — et revocation-autorite.sql l'eprouve."
 }
